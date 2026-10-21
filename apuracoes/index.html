@@ -1106,6 +1106,7 @@ function linhasDomFor(lancs,e,tipos,filOverride){
   return out;
 }
 function fvw(v){var s=v.toFixed(2).replace('.',',');return s.padStart(22,'0').replace(',','.');}
+function winNum(v){var t=String(v===null||v===undefined?'':v).trim();return /^\d+$/.test(t)?parseInt(t,10):t;}
 function linhasWinFor(lancs,e,tipos,filOverride){
   var mapa=e.mapeamento||{},codH=mapa.cod_h||'37';
   var fs=getFiliais(e);
@@ -1117,9 +1118,13 @@ function linhasWinFor(lancs,e,tipos,filOverride){
     var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
     var ex2=Object.assign({},l.ex,{filiallabel:fl});
     var vf=fvw(l.valor),hist=resolveHist(t.hist,ex2);
-    var doc=(l.ex&&l.ex.nota)?l.ex.nota:num;
-    out.push(['C3',1,l.inverter?t.cred:t.deb,l.dFmt,'D',doc,vf,codH,hist,'N',' ',fil]);
-    out.push(['C3',2,l.inverter?t.deb:t.cred,l.dFmt,'C',doc,vf,codH,hist,'N',' ',fil]);num++;
+    /* layout aceito pelo Winthor (conferido com importação real): data DDMMAAAA em texto,
+       conta/cod. histórico/filial/doc como número, DOC vazio quando não há nota, coluna 11 vazia */
+    var dWin=String(l.dDisp||'').replace(/\//g,'');
+    var doc=(l.ex&&l.ex.nota)?winNum(l.ex.nota):null;
+    var deb=winNum(l.inverter?t.cred:t.deb),cred=winNum(l.inverter?t.deb:t.cred);
+    out.push(['C3',1,deb,dWin,'D',doc,vf,winNum(codH),hist,'N',null,winNum(fil)]);
+    out.push(['C3',2,cred,dWin,'C',doc,vf,winNum(codH),hist,'N',null,winNum(fil)]);num++;
   });
   return out;
 }
