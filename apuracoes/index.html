@@ -726,7 +726,7 @@ function paneApuracao(){
   '<div id="novos-alert"></div>'+
   '<div id="apur-alerts"></div>'+
   cardSemArquivo('ap')+
-  '<div class="step-label">2 — Filiais identificadas e prévia</div><div class="divider"></div>'+
+  cabecalhoPrevia('ap','2 — Filiais identificadas e prévia')+
   '<div class="preview-wrap" id="prev-card">'+
     '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar as filiais automaticamente pelo CNPJ.</div>'+
   '</div>'+
@@ -995,6 +995,67 @@ function blocoManuais(a,e){
   '</div>';
 }
 
+
+/* ═══════ EXCLUIR / SUBSTITUIR / LIMPAR ARQUIVOS CARREGADOS ═══════
+   ctx: 'ap' = Apuração (PDF), 'pc' = PIS/COFINS (planilha), 'dp' = Depreciação (PDF) */
+var CTX_ARQ={
+  ap:{lista:function(){return arquivos;},set:function(v){arquivos=v;},render:function(){renderPreviewAll();},ler:function(f){return readOnePdf(f).then(function(r){return[r];});},accept:'.pdf',drop:'drop',nome:'drop-name'},
+  pc:{lista:function(){return arquivosPC;},set:function(v){arquivosPC=v;},render:function(){renderPreviewPC();},ler:function(f){return readOneXlsxPC(f).then(function(r){return[r];});},accept:'.xlsx,.xls',drop:'drop-pc',nome:'drop-name-pc'},
+  dp:{lista:function(){return arquivosDP;},set:function(v){arquivosDP=v;},render:function(){renderPreviewDP();},ler:function(f){return readOnePdfDP(f);},accept:'.pdf',drop:'drop-dp',nome:'drop-name-dp'}
+};
+function botoesArquivo(ctx,id){
+  var c=CTX_ARQ[ctx],a=c.lista().filter(function(x){return x.id===id;})[0]||{};
+  return '<div style="display:flex;gap:6px;flex-shrink:0">'+
+    (a.manualOnly?'':'<label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0" title="Trocar por outro arquivo, mantendo os valores digitados"><i class="ti ti-replace"></i> Substituir'+
+      '<input type="file" accept="'+c.accept+'" style="display:none" onchange="substituirArquivo(\''+ctx+'\',\''+id+'\',this)"></label>')+
+    '<button class="btn btn-danger btn-sm" type="button" onclick="excluirArquivo(\''+ctx+'\',\''+id+'\')" title="Tirar da lista"><i class="ti ti-trash"></i> Excluir</button></div>';
+}
+function botaoUsarEste(ctx,a){
+  if(!a.duplicadoDeId)return'';
+  return '<button class="btn btn-secondary btn-sm" type="button" style="margin-top:6px" onclick="excluirArquivo(\''+ctx+'\',\''+a.duplicadoDeId+'\')"><i class="ti ti-check"></i> Usar este e excluir o anterior</button>';
+}
+function cabecalhoPrevia(ctx,titulo){
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:.4rem">'+
+    '<div class="step-label" style="margin-bottom:0">'+titulo+'</div>'+
+    '<button class="btn btn-secondary btn-sm" type="button" id="limpar-'+ctx+'" style="display:none" onclick="limparArquivos(\''+ctx+'\')"><i class="ti ti-trash"></i> Limpar todos</button>'+
+  '</div><div class="divider"></div>';
+}
+function atualizarLimpar(ctx){
+  var b=document.getElementById('limpar-'+ctx);if(b)b.style.display=CTX_ARQ[ctx].lista().length?'':'none';
+}
+function excluirArquivo(ctx,id){
+  var c=CTX_ARQ[ctx];c.set(c.lista().filter(function(x){return x.id!==id;}));
+  if(!c.lista().length){var d=document.getElementById(c.drop);if(d)d.classList.remove('done');var n=document.getElementById(c.nome);if(n){n.textContent='';n.style.display='none';}}
+  c.render();
+}
+function limparArquivos(ctx){
+  var n=CTX_ARQ[ctx].lista().length;if(!n)return;
+  openModal('<h3>Limpar a lista</h3><p style="font-size:13px;margin-top:8px">Tirar os '+n+' item(ns) carregados desta aba, inclusive os valores digitados? O cadastro das empresas não é alterado.</p>'+
+    '<div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-danger" onclick="closeModal();_limparArquivos(\''+ctx+'\')"><i class="ti ti-trash"></i> Limpar todos</button></div>');
+}
+function _limparArquivos(ctx){
+  var c=CTX_ARQ[ctx];c.set([]);
+  var d=document.getElementById(c.drop);if(d)d.classList.remove('done');
+  var n=document.getElementById(c.nome);if(n){n.textContent='';n.style.display='none';}
+  c.render();
+}
+function substituirArquivo(ctx,id,input){
+  var f=input.files&&input.files[0];input.value='';if(!f)return;
+  var c=CTX_ARQ[ctx],antigo=c.lista().filter(function(x){return x.id===id;})[0];if(!antigo)return;
+  c.ler(f).then(function(novos){
+    var lista=c.lista(),i=lista.indexOf(antigo);if(i<0)return;
+    novos.forEach(function(r,j){
+      r.id=j===0?id:id+'_'+j;
+      /* mantém valores digitados e a empresa/filial escolhidas, se o novo arquivo for da mesma empresa */
+      if(!r.erro&&!r.empresaKey&&antigo.empresaKey){r.empresaKey=antigo.empresaKey;r.filial=antigo.filial;}
+      if(antigo.manuais&&r.empresaKey===antigo.empresaKey)r.manuais=antigo.manuais;
+    });
+    lista.splice.apply(lista,[i,1].concat(novos));
+    c.render();
+  });
+}
+
 /* ═══════ LANÇAMENTO SEM ARQUIVO ═══════
    Para competências sem PDF/planilha (ex.: só diferenças e provisões): escolhe empresa, filial e
    competência e digita os valores dos lançamentos manuais. ctx 'ap' = Apuração, 'pc' = PIS/COFINS. */
@@ -1110,13 +1171,13 @@ function marcarDuplicados(){
     if(a.erro||a.manualOnly){a.duplicado=false;return;}
     var chave=normCnpj(a.cnpj)+'|'+(a.mesano||'');
     if(chave==='|'){a.duplicado=false;return;}
-    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave];}
-    else{a.duplicado=false;vistos[chave]=a.nome;}
+    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave].nome;a.duplicadoDeId=vistos[chave].id;}
+    else{a.duplicado=false;vistos[chave]=a;}
   });
 }
 
 function renderPreviewAll(){
-  marcarDuplicados();
+  marcarDuplicados();atualizarLimpar('ap');
   var prevEl=document.getElementById('prev-card');
   var novosEl=document.getElementById('novos-alert');
   var alertEl=document.getElementById('apur-alerts');
@@ -1130,13 +1191,13 @@ function renderPreviewAll(){
   var html=arquivos.map(function(a){
     if(a.erro){
       return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><strong>'+esc(a.nome)+'</strong>'+
-        '<button class="btn btn-secondary btn-sm" onclick="removerArquivo(\''+a.id+'\')"><i class="ti ti-x"></i></button></div>'+
+        botoesArquivo('ap',a.id)+'</div>'+
         '<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Erro ao ler PDF: '+esc(a.erro)+'</span></div></div>';
     }
     var e=a.empresaKey?db.empresas[a.empresaKey]:null;
     var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
       '<div><strong>'+esc(a.nome)+'</strong><div style="font-size:11px;color:#888;margin-top:2px">'+(a.manualOnly?'Valores digitados':'CNPJ no PDF: '+esc(a.cnpj||'não encontrado'))+' &nbsp;·&nbsp; Competência: '+esc(a.mesano||'—')+'</div></div>'+
-      '<button class="btn btn-secondary btn-sm" onclick="removerArquivo(\''+a.id+'\')"><i class="ti ti-x"></i></button></div>';
+      botoesArquivo('ap',a.id)+'</div>';
     var empBlock;
     var fsEmp=e?getFiliais(e):[];
     if(e&&(a.filial||fsEmp.length<=1)){
@@ -1158,7 +1219,7 @@ function renderPreviewAll(){
     var filialResolvida=e?(a.filial||(fsEmp.length===1?fsEmp[0].fil:null)):null;
     var body='';
     if(e && a.duplicado){
-      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>PDF duplicado — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'", já carregado. Estas linhas <strong>não</strong> serão geradas de novo. Remova este arquivo se foi engano, ou remova o outro se este for o correto.</span></div>';
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>PDF duplicado — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'", já carregado. Estas linhas <strong>não</strong> serão geradas de novo.</span></div>'+botaoUsarEste('ap',a);
     } else if(e&&!filialResolvida){
       body='<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px">Selecione a filial acima para pré-visualizar os lançamentos.</div>';
     } else if(e){
@@ -1290,7 +1351,7 @@ function panePisCofins(){
   '<div id="novos-alert-pc"></div>'+
   '<div id="apur-alerts-pc"></div>'+
   cardSemArquivo('pc')+
-  '<div class="step-label">2 — Empresas identificadas e prévia</div><div class="divider"></div>'+
+  cabecalhoPrevia('pc','2 — Empresas identificadas e prévia')+
   '<div class="preview-wrap" id="prev-card-pc">'+
     '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue as planilhas para identificar a empresa automaticamente pelo CNPJ.</div>'+
   '</div>'+
@@ -1394,8 +1455,8 @@ function marcarDuplicadosPC(){
     if(a.erro||a.manualOnly){a.duplicado=false;return;}
     var chave=normCnpj(a.cnpj)+'|'+(a.mesano||'');
     if(chave==='|'){a.duplicado=false;return;}
-    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave];}
-    else{a.duplicado=false;vistos[chave]=a.nome;}
+    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave].nome;a.duplicadoDeId=vistos[chave].id;}
+    else{a.duplicado=false;vistos[chave]=a;}
   });
 }
 function getTiposPC(e){
@@ -1406,7 +1467,7 @@ function getTiposPC(e){
   return out;
 }
 function renderPreviewPC(){
-  marcarDuplicadosPC();
+  marcarDuplicadosPC();atualizarLimpar('pc');
   var prevEl=document.getElementById('prev-card-pc');
   var novosEl=document.getElementById('novos-alert-pc');
   var alertEl=document.getElementById('apur-alerts-pc');
@@ -1419,13 +1480,13 @@ function renderPreviewPC(){
   var html=arquivosPC.map(function(a){
     if(a.erro){
       return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><strong>'+esc(a.nome)+'</strong>'+
-        '<button class="btn btn-secondary btn-sm" onclick="removerArquivoPC(\''+a.id+'\')"><i class="ti ti-x"></i></button></div>'+
+        botoesArquivo('pc',a.id)+'</div>'+
         '<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Erro ao ler planilha: '+esc(a.erro)+'</span></div></div>';
     }
     var e=a.empresaKey?db.empresas[a.empresaKey]:null;
     var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
       '<div><strong>'+esc(a.nome)+'</strong><div style="font-size:11px;color:#888;margin-top:2px">'+(a.manualOnly?'Valores digitados':'CNPJ na planilha: '+esc(a.cnpj||'não encontrado'))+' &nbsp;·&nbsp; Competência: '+esc(a.mesano||'—')+'</div></div>'+
-      '<button class="btn btn-secondary btn-sm" onclick="removerArquivoPC(\''+a.id+'\')"><i class="ti ti-x"></i></button></div>';
+      botoesArquivo('pc',a.id)+'</div>';
     var empBlock;
     var fsEmp=e?getFiliais(e):[];
     if(e&&(a.filial||fsEmp.length<=1)){
@@ -1447,7 +1508,7 @@ function renderPreviewPC(){
     var filialResolvida=e?(a.filial||(fsEmp.length===1?fsEmp[0].fil:null)):null;
     var body='';
     if(e&&a.duplicado){
-      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>Planilha duplicada — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'", já carregada. Estas linhas <strong>não</strong> serão geradas de novo.</span></div>';
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>Planilha duplicada — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'", já carregada. Estas linhas <strong>não</strong> serão geradas de novo.</span></div>'+botaoUsarEste('pc',a);
     } else if(e&&!filialResolvida){
       body='<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px">Selecione a filial acima para pré-visualizar os lançamentos.</div>';
     } else if(e){
@@ -1567,7 +1628,7 @@ function paneDepreciacao(){
     '<input type="file" id="pdf-dp-in" accept=".pdf" multiple style="display:none">'+
   '</div>'+
   '<div id="apur-alerts-dp"></div>'+
-  '<div class="step-label">2 — Empresas identificadas e prévia</div><div class="divider"></div>'+
+  cabecalhoPrevia('dp','2 — Empresas identificadas e prévia')+
   '<div class="preview-wrap" id="prev-card-dp">'+
     '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar a empresa pelo CNPJ e montar os lançamentos de depreciação.</div>'+
   '</div>'+
@@ -1656,8 +1717,8 @@ function marcarDuplicadosDP(){
   arquivosDP.forEach(function(a){
     if(a.erro){a.duplicado=false;return;}
     var chave=normCnpj(a.cnpj)+'|'+(a.mesano||'');
-    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave];}
-    else{a.duplicado=false;vistos[chave]=a.nome;}
+    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave].nome;a.duplicadoDeId=vistos[chave].id;}
+    else{a.duplicado=false;vistos[chave]=a;}
   });
 }
 /* Resolve empresa/config/filial de um arquivo carregado */
@@ -1698,13 +1759,13 @@ function linhasDepr(a,depr,fil){
 }
 function _fmtBR(v){return v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function renderPreviewDP(){
-  marcarDuplicadosDP();
+  marcarDuplicadosDP();atualizarLimpar('dp');
   var prevEl=document.getElementById('prev-card-dp'),alertEl=document.getElementById('apur-alerts-dp'),btn=document.getElementById('btn-gerar-dp');
   if(alertEl)alertEl.innerHTML='';
   if(!arquivosDP.length){if(prevEl)prevEl.innerHTML='<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar a empresa pelo CNPJ e montar os lançamentos de depreciação.</div>';if(btn)btn.disabled=true;return;}
   var empKeys=Object.keys(db.empresas),total=0,algumErro=false;
   var html=arquivosDP.map(function(a){
-    var btnX='<button class="btn btn-secondary btn-sm" onclick="removerArquivoDP(\''+a.id+'\')"><i class="ti ti-x"></i></button>';
+    var btnX=botoesArquivo('dp',a.id);
     if(a.erro)return'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><strong>'+esc(a.nome)+'</strong>'+btnX+'</div><div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>'+esc(a.erro)+'</span></div></div>';
     var x=ctxDP(a);
     var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
@@ -1725,7 +1786,7 @@ function renderPreviewDP(){
     }
     var body='';
     if(a.duplicado){
-      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>Duplicado — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'". Estas linhas <strong>não</strong> serão geradas de novo.</span></div>';
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>Duplicado — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'". Estas linhas <strong>não</strong> serão geradas de novo.</span></div>'+botaoUsarEste('dp',a);
     } else if(x.depr&&x.fil){
       var L=linhasDepr(a,x.depr,x.fil);total+=L.rows.length;
       var ok=Math.abs(L.totD-L.totPdf)<0.005;if(!ok)algumErro=true;
