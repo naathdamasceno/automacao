@@ -1222,8 +1222,11 @@ function addSemArquivo(ctx){
 }
 
 /* ═══════ PIS/COFINS: valores digitados para os tipos extras (pcextra_) ═══════ */
+/* Winthor (4E, Safra...): todas as regras ativas de PIS/COFINS aparecem para digitar o valor.
+   Demais empresas: só os tipos extras (pcextra_). */
 function tiposManuaisPC(e){
-  return getTiposPC(e).filter(function(t){return t.key.indexOf('pcextra_')===0&&t.ativo;});
+  var todas=pcEditavel(e);
+  return getTiposPC(e).filter(function(t){return t.ativo&&(todas||t.key.indexOf('pcextra_')===0);});
 }
 function setManualPC(id,key,val){
   var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
@@ -1300,13 +1303,16 @@ function blocoManuaisPC(a,e){
   var ts=tiposManuaisPC(e);if(!ts.length)return'';
   if(!a.mesano)return'';
   a.manuais=a.manuais||{};
-  return '<details style="margin-top:10px;padding:10px 12px;border:0.5px dashed #0AE18C;border-radius:8px;background:#F7FDFA"'+(a.manualOnly||Object.keys(a.manuais).length?' open':'')+'>'+
-    '<summary style="font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-pencil"></i> Valores digitados — '+ts.length+' tipos de PIS/COFINS desta empresa</summary><div style="margin-top:8px">'+
+  var win=pcEditavel(e),lidosPorTipo={};
+  if(win)(a.lancamentos||[]).forEach(function(l){lidosPorTipo[l.tipo]=(lidosPorTipo[l.tipo]||0)+l.valor;});
+  return '<details style="margin-top:10px;padding:10px 12px;border:0.5px dashed #0AE18C;border-radius:8px;background:#F7FDFA"'+(win||a.manualOnly||Object.keys(a.manuais).length?' open':'')+'>'+
+    '<summary style="font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-pencil"></i> Valores digitados — '+ts.length+(win?' regras':' tipos')+' de PIS/COFINS desta empresa</summary><div style="margin-top:8px">'+
     ts.map(function(t){
-      var v=a.manuais[t.key],falta=!t.deb||!t.cred;
+      var v=a.manuais[t.key],falta=!t.deb||!t.cred,lidos=lidosPorTipo[t.key];
       return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
         '<div style="flex:1;min-width:180px;font-size:12px">'+esc(t.label)+
-          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+'</div></div>'+
+          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+
+          (lidos?' <span style="color:#00682F;font-weight:500">· lido da planilha: '+fmtValorBR(lidos)+' (já incluído; só digite se houver valor a mais)</span>':'')+'</div></div>'+
         '<input type="text" inputmode="decimal" placeholder="0,00" aria-label="Valor '+esc(t.label)+'" value="'+(v?fmtValorBR(v):'')+'" '+
           'onchange="setManualPC(\''+a.id+'\',\''+esc(t.key)+'\',this.value)" '+
           'style="width:140px;height:32px;padding:0 10px;border:0.5px solid #D3D1C7;border-radius:8px;font-size:13px;text-align:right">'+
@@ -1652,7 +1658,7 @@ function renderPreviewPC(){
     if(a.erro){
       return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><strong>'+esc(a.nome)+'</strong>'+
         botoesArquivo('pc',a.id)+'</div>'+
-        '<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Erro ao ler planilha: '+esc(a.erro)+'</span></div></div>';
+        '<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Erro ao ler planilha: '+esc(a.erro)+' Se preferir, use <strong>Sem arquivo? Lance só os valores digitados</strong> acima para digitar os valores nas regras da empresa.</span></div></div>';
     }
     var e=a.empresaKey?db.empresas[a.empresaKey]:null;
     var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
