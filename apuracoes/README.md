@@ -1,6 +1,9 @@
 # Apurações · Planning
 
-Gera os arquivos de importação (Domínio TXT / Winthor XLSX) de ICMS e PIS/COFINS a partir dos livros fiscais em PDF e dos resumos em Excel.
+Gera os arquivos de importação (Domínio TXT / Winthor XLSX) de ICMS e PIS/COFINS a partir dos livros fiscais em PDF e dos resumos em Excel, e os lançamentos de depreciação (Winthor) a partir do PDF "Resumo da Depreciação Fiscal por Conta Patrimonial" da Domínio.
+
+- **Depreciação:** cada grupo do resumo gera D na conta de despesa e C na conta do ativo (coluna "Depreciação do mês"). As contas ficam em Empresas → Editar → Mapeamento Depreciação (`mapeamento._depreciacao`).
+- **Históricos por filial:** além de `{filiallabel}` (MTZ / FL 003), há `{filialnome}` (MATRIZ / FILIAL TO) e `{filialsigla}` (MTZ / FL TO), a partir da UF cadastrada em cada filial.
 
 - **Página:** GitHub Pages (`index.html`, arquivo único, sem build).
 - **Dados e login:** Supabase, projeto `apuracoes` (região São Paulo).

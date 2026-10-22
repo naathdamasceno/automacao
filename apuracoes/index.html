@@ -435,6 +435,7 @@ function onEmpresasChanged(){
   });
   if(document.getElementById('prev-card'))renderPreviewAll();
   if(document.getElementById('prev-card-pc'))renderPreviewPC();
+  if(document.getElementById('prev-card-dp'))renderPreviewDP();
 }
 
 /* ── Download de arquivos: no Claude passa pela confirmação do visualizador; localmente, download direto.
@@ -495,14 +496,16 @@ function renderMain(){
     '<div class="tabs">'+
       '<button class="tab active" onclick="sTab(\'apuracao\',this)"><i class="ti ti-chart-bar"></i> Apuração</button>'+
       '<button class="tab" onclick="sTab(\'piscofins\',this)"><i class="ti ti-file-spreadsheet"></i> PIS/COFINS</button>'+
+      '<button class="tab" onclick="sTab(\'depreciacao\',this)"><i class="ti ti-building-warehouse"></i> Depreciação</button>'+
       (p.canEdit?'<button class="tab" onclick="sTab(\'empresas\',this)"><i class="ti ti-building"></i> Empresas</button>':'')+
       (ME.isAdmin?'<button class="tab" onclick="sTab(\'usuarios\',this)"><i class="ti ti-users"></i> Usuários</button>':'')+
     '</div>'+
     '<div class="pane active" id="pane-apuracao">'+paneApuracao()+'</div>'+
     '<div class="pane" id="pane-piscofins">'+panePisCofins()+'</div>'+
+    '<div class="pane" id="pane-depreciacao">'+paneDepreciacao()+'</div>'+
     (p.canEdit?'<div class="pane" id="pane-empresas">'+paneEmpresas()+'</div>':'')+
     (ME.isAdmin?'<div class="pane" id="pane-usuarios">'+paneUsuarios()+'</div>':'');
-  setupDrop();setupDropPC();onEmpresasChanged();
+  setupDrop();setupDropPC();setupDropDP();onEmpresasChanged();
   if(ME.isAdmin)carregarUsuarios();
 }
 function boot(){
@@ -535,7 +538,7 @@ function doLogout(){
   if(_canalEmpresas){sb.removeChannel(_canalEmpresas);_canalEmpresas=null;}
   sb.auth.signOut().finally(function(){
     ME.login='';ME.nome='';ME.perfil='';ME.isAdmin=false;ME.canEdit=false;
-    db.empresas={};arquivos=[];arquivosPC=[];
+    db.empresas={};arquivos=[];arquivosPC=[];arquivosDP=[];
     renderLogin();
   });
 }
@@ -703,6 +706,7 @@ function sTab(id,el){
   el.classList.add('active');document.getElementById('pane-'+id).classList.add('active');
   if(id==='apuracao'){setupDrop();renderPreviewAll();}
   if(id==='piscofins'){setupDropPC();renderPreviewPC();}
+  if(id==='depreciacao'){setupDropDP();renderPreviewDP();}
 }
 
 /* ══════════════════ APURAÇÃO ══════════════════ */
@@ -906,6 +910,16 @@ function parsePdfLines(lines){
   return {mesano:mesano,cnpj:extrairCnpj(joined),lancamentos:lanc};
 }
 
+/* Placeholders por filial: {filialnome} = MATRIZ / FILIAL TO · {filialsigla} = MTZ / FL TO
+   (matriz = CNPJ terminado em 0001; UF vem do cadastro da filial). Sem UF, usa o {filiallabel}. */
+function filialPlaceholders(e,fil){
+  var fs=e?getFiliais(e):[],f=null;fs.forEach(function(x){if(String(x.fil)===String(fil))f=x;});
+  var lbl=filialLabel(fil);
+  var matriz=f?/0001\d{2}$/.test(normCnpj(f.cnpj)):String(fil)==='1';
+  if(matriz)return{filiallabel:lbl,filialnome:'MATRIZ',filialsigla:'MTZ'};
+  var uf=f&&f.uf?String(f.uf).toUpperCase():'';
+  return{filiallabel:lbl,filialnome:uf?'FILIAL '+uf:lbl,filialsigla:uf?'FL '+uf:lbl};
+}
 function resolveHist(tpl,ex){
   var h=String(tpl||'');
   if(ex)Object.keys(ex).forEach(function(k){h=h.split('{'+k+'}').join(ex[k]||'');});
@@ -1100,7 +1114,7 @@ function linhasDomFor(lancs,e,tipos,filOverride){
   var fl=filialLabel(fil);
   lancs.forEach(function(l){
     var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
-    var ex2=Object.assign({},l.ex,{filiallabel:fl});
+    var ex2=Object.assign({},l.ex,filialPlaceholders(e,fil));
     out.push({dDisp:l.dDisp,dFmt:l.dFmt,deb:l.inverter?t.cred:t.deb,cred:l.inverter?t.deb:t.cred,val:l.valor,lote:lote,hist:resolveHist(t.hist,ex2)});lote++;
   });
   return out;
@@ -1116,7 +1130,7 @@ function linhasWinFor(lancs,e,tipos,filOverride){
   var out=[],num=1;
   lancs.forEach(function(l){
     var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
-    var ex2=Object.assign({},l.ex,{filiallabel:fl});
+    var ex2=Object.assign({},l.ex,filialPlaceholders(e,fil));
     var vf=fvw(l.valor),hist=resolveHist(t.hist,ex2);
     /* layout aceito pelo Winthor (conferido com importação real): data DDMMAAAA em texto,
        conta/cod. histórico/filial/doc como número, DOC vazio quando não há nota, coluna 11 vazia */
@@ -1398,6 +1412,288 @@ function gerarArquivoPC(){
   stPC(gerou+' arquivo(s) gerado(s)'+(pendentes?' — '+pendentes+' planilha(s) sem empresa/filial identificada foram ignoradas.':'')+(duplicados?' — '+duplicados+' planilha(s) duplicada(s) foram ignoradas.':'.'),(pendentes||duplicados)?'warn':'ok');
 }
 
+
+/* ══════════════════ DEPRECIAÇÃO (Resumo da Depreciação Fiscal Domínio → Winthor) ══════════════════
+   Lê o PDF "Resumo da Depreciação Fiscal por Conta Patrimonial" da Domínio, pega a coluna
+   "Depreciação do mês" de cada grupo e gera, por grupo, 2 linhas C3 (D na conta de despesa,
+   C na conta do ativo) no layout contábil PC Sistemas — colunas A a L, só valores, sem cabeçalho.
+   O mapeamento grupo → contas fica no cadastro da empresa (mapeamento._depreciacao). */
+var DEPR_PADRAO={
+  '28810269000152':{cod_h:'1',filial:'7',grupos:[
+    {g:'2',nome:'COMPUTADORES E PERIFERICOS',d:'9954',c:'430',nd:'1',nc:'2'},
+    {g:'3',nome:'MAQUINAS E EQUIPAMENTOS',d:'9954',c:'441',nd:'1',nc:'2'},
+    {g:'4',nome:'MOVEIS E UTENSILIOS',d:'9954',c:'354',nd:'1',nc:'2'},
+    {g:'1',nome:'VEICULOS 25%',d:'9954',c:'428',nd:'1',nc:'2'},
+    {g:'5',nome:'TELEFONES E CELULARES',d:'9954',c:'9741',nd:'1',nc:'2'},
+    {g:'6',nome:'BENFEITORIA FILIAL AP',d:'9954',c:'1007',nd:'1',nc:'2'},
+    {g:'7',nome:'CONSTRUÇÃO MATRIZ',d:'9954',c:'341',nd:'1',nc:'2'},
+    {g:'9',nome:'GERADORES',d:'9954',c:'10133',nd:'3',nc:'4'}
+  ]}
+};
+var DEPR_HIST='REF A DEPRECIAÇÃO ACUMULADA DE {grupo} COMPET - {mesano}';
+var arquivosDP=[];
+
+function _clone(o){return JSON.parse(JSON.stringify(o));}
+function deprPadraoPorCnpjs(cnpjs){
+  for(var i=0;i<cnpjs.length;i++){var c=normCnpj(cnpjs[i]);if(DEPR_PADRAO[c])return _clone(DEPR_PADRAO[c]);}
+  return null;
+}
+/* Configuração de depreciação da empresa: a salva no cadastro; senão o padrão conhecido pelo CNPJ */
+function getDepr(e,cnpjPdf){
+  var m=e&&e.mapeamento&&e.mapeamento._depreciacao;
+  if(m&&m.grupos&&m.grupos.length)return m;
+  var cnpjs=[cnpjPdf||''];
+  if(e)getFiliais(e).forEach(function(f){cnpjs.push(f.cnpj);});
+  return deprPadraoPorCnpjs(cnpjs);
+}
+
+function paneDepreciacao(){
+  return '<div class="step-label">1 — PDFs do Resumo da Depreciação Fiscal (Domínio)</div><div class="divider"></div>'+
+  '<div class="card">'+
+    '<div class="drop" id="drop-dp" onclick="document.getElementById(\'pdf-dp-in\').click()">'+
+      '<i class="ti ti-building-warehouse" style="font-size:32px;color:#0AE18C;display:block;margin-bottom:6px"></i>'+
+      '<div class="drop-label">Clique ou arraste um ou mais <strong>PDFs do Resumo da Depreciação Fiscal por Conta Patrimonial</strong></div>'+
+      '<div class="drop-name" id="drop-name-dp"></div>'+
+    '</div>'+
+    '<input type="file" id="pdf-dp-in" accept=".pdf" multiple style="display:none">'+
+  '</div>'+
+  '<div id="apur-alerts-dp"></div>'+
+  '<div class="step-label">2 — Empresas identificadas e prévia</div><div class="divider"></div>'+
+  '<div class="preview-wrap" id="prev-card-dp">'+
+    '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar a empresa pelo CNPJ e montar os lançamentos de depreciação.</div>'+
+  '</div>'+
+  '<button class="btn btn-primary btn-full" id="btn-gerar-dp" disabled onclick="gerarArquivoDP()" style="margin-top:.25rem">'+
+    '<i class="ti ti-download"></i> Gerar arquivo(s) de importação Winthor</button>'+
+  '<div class="status-msg" id="apur-st-dp"></div>';
+}
+function setupDropDP(){
+  var drop=document.getElementById('drop-dp'),inp=document.getElementById('pdf-dp-in');
+  if(!drop||!inp||drop.getAttribute('data-ok'))return;
+  drop.setAttribute('data-ok','1');
+  ['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('over');});});
+  drop.addEventListener('dragleave',function(e){e.preventDefault();drop.classList.remove('over');});
+  drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('over');var fs=e.dataTransfer&&e.dataTransfer.files;if(fs&&fs.length)loadPdfsDP(fs);});
+  inp.addEventListener('change',function(){if(inp.files&&inp.files.length)loadPdfsDP(inp.files);inp.value='';});
+}
+
+/* Pura: linhas do PDF → {empresa,cnpj,ordem:[MM/AAAA],comp:{MM/AAAA:[{g,nome,dep}]}} */
+function parseResumoDepreciacao(lines){
+  var NUM='-?\\d{1,3}(?:\\.\\d{3})*,\\d{2}';
+  var ROW=new RegExp('^(\\d{1,4})\\s+(.+?)\\s+((?:'+NUM+'\\s*){3,})$');
+  var res={empresa:'',cnpj:'',ordem:[],comp:{}},cur=null;
+  function ensure(c){if(!res.comp[c]){res.comp[c]=[];res.ordem.push(c);}}
+  lines.forEach(function(raw,idx){
+    var l=String(raw).replace(/\s+/g,' ').replace(/(\d)\s+,(\d{2})\b/g,'$1,$2').trim();
+    if(!res.empresa&&l&&!/^P[áa]gina/i.test(l))res.empresa=l.replace(/\s*P[áa]gina:.*$/i,'').trim();
+    var cn=l.match(/C\.?N\.?P\.?J\.?:?\s*([\d.\/-]{14,18})/i);
+    if(cn&&!res.cnpj)res.cnpj=cn[1];
+    var m=l.match(/Compet[êe]ncia:?\s*\d{2}\/(\d{2})\/(\d{4})/i);
+    if(m){cur=m[1]+'/'+m[2];ensure(cur);return;}
+    m=l.match(/Compet[êe]ncia:?\s*(\d{2})\/(\d{4})/i);
+    if(m&&!cur){cur=m[1]+'/'+m[2];ensure(cur);return;}
+    var r=l.match(ROW);
+    if(r&&cur){
+      var nums=r[3].trim().split(/\s+/).map(function(s){var neg=s.charAt(0)==='-';var v=parseValorBR(s.replace(/^-/,''));return neg?-v:v;});
+      res.comp[cur].push({g:String(+r[1]),nome:r[2].trim(),dep:nums[2]});
+    }
+  });
+  res.ordem=res.ordem.filter(function(c){return res.comp[c].length;});
+  return res;
+}
+
+function readOnePdfDP(file){
+  return new Promise(function(resolve){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      pdfjsLib.getDocument({data:new Uint8Array(ev.target.result)}).promise.then(function(pdf){
+        var arr=[];for(var i=1;i<=pdf.numPages;i++)arr.push(pdf.getPage(i));
+        return Promise.all(arr).then(function(pl){return Promise.all(pl.map(function(p){return p.getTextContent();}));})
+        .then(function(cs){
+          var lines=[];cs.forEach(function(c){lines=lines.concat(linesFromContent(c));});
+          var p=parseResumoDepreciacao(lines);
+          if(!p.ordem.length){resolve([{nome:file.name,erro:'Não encontrei as linhas do Resumo da Depreciação Fiscal neste PDF. Confira se é o relatório "Resumo da Depreciação Fiscal por Conta Patrimonial" da Domínio, gerado com texto (não escaneado).'}]);return;}
+          var match=matchEmpresaByCnpj(p.cnpj);
+          resolve(p.ordem.map(function(c){
+            return{nome:file.name,cnpj:p.cnpj,empresaPdf:p.empresa,mesano:c,grupos:p.comp[c],multi:p.ordem.length,empresaKey:match?match.key:null,filial:match?match.fil:null};
+          }));
+        });
+      }).catch(function(err){resolve([{nome:file.name,erro:err.message}]);});
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+function loadPdfsDP(fileList){
+  var files=Array.prototype.slice.call(fileList).filter(function(f){return/\.pdf$/i.test(f.name);});
+  if(!files.length)return;
+  var dn=document.getElementById('drop-name-dp');if(dn){dn.style.display='block';dn.textContent='Lendo '+files.length+' PDF(s)...';}
+  Promise.all(files.map(readOnePdfDP)).then(function(results){
+    results.forEach(function(lista){lista.forEach(function(r){r.id='d'+Date.now()+Math.random().toString(36).slice(2,7);arquivosDP.push(r);});});
+    var d=document.getElementById('drop-dp');if(d)d.classList.add('done');
+    if(dn)dn.textContent=arquivosDP.length+' competência(s) carregada(s)';
+    renderPreviewDP();
+  });
+}
+function setArquivoEmpresaDP(id,k){
+  var a=arquivosDP.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.empresaKey=k||null;
+  var fs=k&&db.empresas[k]?getFiliais(db.empresas[k]):[];
+  a.filial=fs.length===1?fs[0].fil:null;
+  renderPreviewDP();
+}
+function setArquivoFilialDP(id,fil){var a=arquivosDP.filter(function(x){return x.id===id;})[0];if(!a)return;a.filial=fil||null;renderPreviewDP();}
+function removerArquivoDP(id){arquivosDP=arquivosDP.filter(function(x){return x.id!==id;});renderPreviewDP();}
+function marcarDuplicadosDP(){
+  var vistos={};
+  arquivosDP.forEach(function(a){
+    if(a.erro){a.duplicado=false;return;}
+    var chave=normCnpj(a.cnpj)+'|'+(a.mesano||'');
+    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave];}
+    else{a.duplicado=false;vistos[chave]=a.nome;}
+  });
+}
+/* Resolve empresa/config/filial de um arquivo carregado */
+function ctxDP(a){
+  var e=a.empresaKey?db.empresas[a.empresaKey]:null;
+  var depr=getDepr(e,a.cnpj);
+  var fs=e?getFiliais(e):[];
+  var fil=e?(a.filial||(fs.length===1?fs[0].fil:null)):(depr?depr.filial:null);
+  return{e:e,depr:depr,fs:fs,fil:fil,nome:e?e.nome:(a.empresaPdf||'')};
+}
+function _numOuTexto(v){var s=String(v===undefined||v===null?'':v).trim();return/^\d+$/.test(s)?parseInt(s,10):s;}
+/* Monta as linhas Winthor (A–L) + avisos de um arquivo */
+function linhasDepr(a,depr,fil){
+  var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
+  var ld=new Date(yy,mm,0).getDate();
+  var dFmt=String(ld).padStart(2,'0')+String(mm).padStart(2,'0')+yy;
+  var codH=_numOuTexto(depr.cod_h||'1');
+  var rows=[],notes=[],usados={},porG={};
+  a.grupos.forEach(function(g){porG[g.g]=g;});
+  function nn(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,' ').trim();}
+  (depr.grupos||[]).forEach(function(c){
+    var g=porG[String(+c.g)];
+    if(!g){notes.push({k:'warn',t:'Grupo '+c.g+' ('+c.nome+') não aparece no PDF; ficou de fora.'});return;}
+    usados[g.g]=true;
+    if(nn(g.nome)!==nn(c.nome))notes.push({k:'warn',t:'Grupo '+c.g+': no PDF o nome é "'+g.nome+'" e no cadastro é "'+c.nome+'". Confira se é o mesmo grupo.'});
+    if(!c.d||!c.c){notes.push({k:'err',t:'Grupo '+c.g+' ('+c.nome+') está sem conta débito ou crédito no cadastro.'});return;}
+    if(!g.dep){notes.push({k:'warn',t:'Grupo '+c.g+' ('+c.nome+') com depreciação zero no mês; não gerei lançamento.'});return;}
+    var hist=DEPR_HIST.replace('{grupo}',c.nome).replace('{mesano}',a.mesano);
+    var vf=fvw(g.dep);
+    /* mesmo formato aceito pelo Winthor nos lançamentos de ICMS: DOC e coluna 11 vazios */
+    rows.push(['C3',_numOuTexto(c.nd||1),_numOuTexto(c.d),dFmt,'D',null,vf,codH,hist,'N',null,_numOuTexto(fil)]);
+    rows.push(['C3',_numOuTexto(c.nc||2),_numOuTexto(c.c),dFmt,'C',null,vf,codH,hist,'N',null,_numOuTexto(fil)]);
+  });
+  a.grupos.forEach(function(g){if(!usados[g.g])notes.push({k:'err',t:'Grupo '+g.g+' ('+g.nome+') está no PDF com R$ '+g.dep.toFixed(2).replace('.',',')+', mas não tem conta cadastrada. Inclua em Empresas → Mapeamento Depreciação.'});});
+  var totPdf=a.grupos.reduce(function(s,g){return s+(g.dep||0);},0);
+  var totD=rows.filter(function(r){return r[4]==='D';}).reduce(function(s,r){return s+parseFloat(r[6]);},0);
+  return{rows:rows,notes:notes,totPdf:totPdf,totD:totD};
+}
+function _fmtBR(v){return v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function renderPreviewDP(){
+  marcarDuplicadosDP();
+  var prevEl=document.getElementById('prev-card-dp'),alertEl=document.getElementById('apur-alerts-dp'),btn=document.getElementById('btn-gerar-dp');
+  if(alertEl)alertEl.innerHTML='';
+  if(!arquivosDP.length){if(prevEl)prevEl.innerHTML='<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar a empresa pelo CNPJ e montar os lançamentos de depreciação.</div>';if(btn)btn.disabled=true;return;}
+  var empKeys=Object.keys(db.empresas),total=0,algumErro=false;
+  var html=arquivosDP.map(function(a){
+    var btnX='<button class="btn btn-secondary btn-sm" onclick="removerArquivoDP(\''+a.id+'\')"><i class="ti ti-x"></i></button>';
+    if(a.erro)return'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><strong>'+esc(a.nome)+'</strong>'+btnX+'</div><div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>'+esc(a.erro)+'</span></div></div>';
+    var x=ctxDP(a);
+    var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+      '<div><strong>'+esc(a.nome)+'</strong><div style="font-size:11px;color:#888;margin-top:2px">CNPJ no PDF: '+esc(a.cnpj||'não encontrado')+' &nbsp;·&nbsp; Competência: '+esc(a.mesano)+(a.multi>1?' &nbsp;·&nbsp; PDF com '+a.multi+' competências':'')+'</div></div>'+btnX+'</div>';
+    var empBlock;
+    if(x.e&&x.fs.length>1&&!a.filial){
+      empBlock='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>"'+esc(x.e.nome)+'" tem '+x.fs.length+' filiais. Selecione a filial:</span></div>'+
+        '<select onchange="setArquivoFilialDP(\''+a.id+'\',this.value)"><option value="">— selecione a filial —</option>'+
+        x.fs.map(function(f){return'<option value="'+esc(f.fil)+'">FIL '+esc(f.fil)+' — '+esc(f.cnpj)+'</option>';}).join('')+'</select>';
+    } else if(x.e){
+      empBlock='<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><i class="ti ti-check" style="color:#0AE18C"></i><span style="font-size:12px">Empresa identificada: <strong>'+esc(x.e.nome)+'</strong> — FIL <strong>'+esc(x.fil)+'</strong></span>'+sisPill('winthor')+'</div>';
+    } else if(x.depr){
+      empBlock='<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><i class="ti ti-check" style="color:#0AE18C"></i><span style="font-size:12px"><strong>'+esc(a.empresaPdf)+'</strong> — FIL <strong>'+esc(x.fil)+'</strong> (contas padrão de depreciação; empresa não cadastrada em Empresas)</span>'+sisPill('winthor')+'</div>';
+    } else {
+      empBlock='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Não identifiquei a empresa pelo CNPJ ou ela não tem Mapeamento Depreciação. Selecione a empresa (o mapeamento é configurado em Empresas):</span></div>'+
+        '<select onchange="setArquivoEmpresaDP(\''+a.id+'\',this.value)" style="margin-top:4px"><option value="">— selecione a empresa —</option>'+
+        empKeys.map(function(k){return'<option value="'+k+'"'+(a.empresaKey===k?' selected':'')+'>'+esc(db.empresas[k].nome)+'</option>';}).join('')+'</select>';
+    }
+    var body='';
+    if(a.duplicado){
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>Duplicado — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'". Estas linhas <strong>não</strong> serão geradas de novo.</span></div>';
+    } else if(x.depr&&x.fil){
+      var L=linhasDepr(a,x.depr,x.fil);total+=L.rows.length;
+      var ok=Math.abs(L.totD-L.totPdf)<0.005;if(!ok)algumErro=true;
+      body='<div style="margin-top:8px">'+
+        '<div class="alert '+(ok?'alert-ok':'alert-err')+'"><i class="ti ti-'+(ok?'circle-check':'alert-circle')+'"></i><span>'+(ok?'Débitos = créditos = R$ '+_fmtBR(L.totD)+', igual à soma da depreciação do mês no PDF.':'Total lançado R$ '+_fmtBR(L.totD)+' difere da soma do PDF R$ '+_fmtBR(L.totPdf)+'. Veja os avisos.')+'</span></div>'+
+        L.notes.map(function(n){return'<div class="alert alert-'+n.k+'"><i class="ti ti-alert-triangle"></i><span>'+esc(n.t)+'</span></div>';}).join('')+
+        '<table class="preview-table"><tr><th>NÚM</th><th>COD RED</th><th>DATA</th><th>NAT</th><th>VALOR</th><th>HISTÓRICO</th><th>FIL</th></tr>'+
+        L.rows.map(function(r){return'<tr><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td><td>'+r[6]+'</td><td>'+esc(r[8])+'</td><td>'+r[11]+'</td></tr>';}).join('')+
+        '</table></div>';
+    } else if(x.e&&!x.depr){
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>'+esc(x.e.nome)+' não tem Mapeamento Depreciação. Configure em Empresas → Editar.</span></div>';
+    }
+    return'<div class="card">'+head+empBlock+body+'</div>';
+  }).join('');
+  if(prevEl)prevEl.innerHTML=html;
+  if(alertEl&&total)alertEl.innerHTML='<div class="alert '+(algumErro?'alert-warn':'alert-ok')+'"><i class="ti ti-'+(algumErro?'alert-triangle':'check')+'"></i><span>'+(algumErro?'Há diferença entre o PDF e os lançamentos — confira antes de gerar. ':'Pronto para gerar — ')+'<strong>'+total+'</strong> linhas no total.</span></div>';
+  if(btn)btn.disabled=!total;
+}
+function gerarArquivoDP(){
+  marcarDuplicadosDP();
+  var gerou=0,pendentes=0,dup=0;
+  arquivosDP.forEach(function(a){
+    if(a.erro)return;
+    if(a.duplicado){dup++;return;}
+    var x=ctxDP(a);
+    if(!x.depr||!x.fil){pendentes++;return;}
+    var L=linhasDepr(a,x.depr,x.fil);if(!L.rows.length)return;
+    var ws=XLSX.utils.aoa_to_sheet(L.rows);
+    ws['!cols']=[{wch:5},{wch:8},{wch:11},{wch:10},{wch:10},{wch:5},{wch:24},{wch:7},{wch:70},{wch:11},{wch:3},{wch:7}];
+    var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'DEPRECIACAO');
+    saveXlsx(wb,'DEPRECIACAO_WINTHOR_'+normCnpj(a.cnpj)+'_'+a.mesano.replace('/','_')+'.xlsx');gerou++;
+  });
+  var el=document.getElementById('apur-st-dp');
+  function st(m,t){if(el){el.textContent=m;el.className='status-msg'+(t?' '+t:'');}}
+  if(!gerou){st(pendentes?'Identifique a empresa/filial de todos os PDFs antes de gerar.':(dup?'Todos os PDFs carregados são duplicados.':'Nenhuma linha gerada.'),'err');return;}
+  st(gerou+' arquivo(s) gerado(s)'+(pendentes?' — '+pendentes+' sem empresa/filial foram ignorados':'')+(dup?' — '+dup+' duplicado(s) ignorado(s)':'')+'.',(pendentes||dup)?'warn':'ok');
+}
+
+/* ── Cadastro: Mapeamento Depreciação (dentro do formulário de Empresas) ── */
+function deprRowHtml(g){
+  g=g||{};
+  function inp(cls,v,ph,w){return'<input type="text" class="'+cls+'" value="'+esc(v||'')+'" placeholder="'+ph+'" style="height:30px;font-size:12px;padding:0 6px;border:0.5px solid #D3D1C7;border-radius:6px;min-width:0'+(w?';width:'+w:'')+'">';}
+  return'<div class="dp-row" style="display:grid;grid-template-columns:48px minmax(120px,1fr) 70px 70px 44px 44px 30px;gap:6px;margin-bottom:6px;align-items:center">'+
+    inp('dp-g',g.g,'Grupo')+inp('dp-nome',g.nome,'Conta patrimonial')+inp('dp-d',g.d,'Débito')+inp('dp-c',g.c,'Crédito')+inp('dp-nd',g.nd||'1','Nº D')+inp('dp-nc',g.nc||'2','Nº C')+
+    '<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px" onclick="this.parentElement.remove()"><i class="ti ti-x"></i></button></div>';
+}
+function addDeprRow(){var el=document.getElementById('ef-dp-list');if(!el)return;var d=document.createElement('div');d.innerHTML=deprRowHtml();el.appendChild(d.firstChild);}
+function carregarPadraoDepr(){
+  var cnpjs=[];document.querySelectorAll('#ef-filiais-list .ef-fil-cnpj').forEach(function(i){cnpjs.push(i.value);});
+  var p=deprPadraoPorCnpjs(cnpjs),st=document.getElementById('ef-dp-st');
+  if(!p){if(st){st.textContent='Não há padrão de depreciação para os CNPJs desta empresa.';st.className='status-msg err';}return;}
+  document.getElementById('ef-dp-list').innerHTML=p.grupos.map(deprRowHtml).join('');
+  document.getElementById('ef-dp-codh').value=p.cod_h;
+  if(st){st.textContent='Padrão carregado — revise e salve.';st.className='status-msg ok';}
+}
+function buildDeprForm(e){
+  var d=(e.mapeamento&&e.mapeamento._depreciacao)||null;
+  if(!d||!d.grupos||!d.grupos.length){var cs=e.nome?getFiliais(e).map(function(f){return f.cnpj;}):[];d=deprPadraoPorCnpjs(cs)||{cod_h:'1',grupos:[]};}
+  return'<div class="sep"></div><div class="section-title">Mapeamento Depreciação <span style="font-weight:300;color:#aaa;font-size:11px">(Resumo da Depreciação Fiscal da Domínio → Winthor — cada grupo gera D na conta de despesa e C na conta do ativo; a ordem abaixo é a ordem no arquivo)</span></div>'+
+    '<div class="field" style="max-width:200px"><label>Código de Histórico (depreciação)</label><input type="text" id="ef-dp-codh" value="'+esc(d.cod_h||'1')+'"></div>'+
+    '<div style="display:grid;grid-template-columns:48px minmax(120px,1fr) 70px 70px 44px 44px 30px;gap:6px;font-size:10px;color:#888;margin-bottom:4px"><span>Grupo</span><span>Conta patrimonial</span><span>Débito</span><span>Crédito</span><span>Nº D</span><span>Nº C</span><span></span></div>'+
+    '<div id="ef-dp-list">'+d.grupos.map(deprRowHtml).join('')+'</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="addDeprRow()"><i class="ti ti-plus"></i> Adicionar grupo</button>'+
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="carregarPadraoDepr()"><i class="ti ti-refresh"></i> Carregar padrão (planilha 4E)</button>'+
+    '</div><div class="status-msg" id="ef-dp-st"></div>';
+}
+function lerDeprForm(){
+  var grupos=[];
+  document.querySelectorAll('#ef-dp-list .dp-row').forEach(function(r){
+    function v(c){return((r.querySelector('.'+c)||{}).value||'').trim();}
+    if(!v('dp-g')&&!v('dp-d')&&!v('dp-c'))return;
+    grupos.push({g:v('dp-g'),nome:v('dp-nome').toUpperCase(),d:v('dp-d'),c:v('dp-c'),nd:v('dp-nd')||'1',nc:v('dp-nc')||'2'});
+  });
+  return{cod_h:((document.getElementById('ef-dp-codh')||{}).value||'1').trim(),grupos:grupos};
+}
+
 /* ══════════════════ EMPRESAS ══════════════════ */
 function paneEmpresas(){
   var keys=Object.keys(db.empresas);
@@ -1516,24 +1812,25 @@ function confirmarExcEmp(k){
 }
 
 var _tidx=0,_fidx=0;
-function filialRowHtml(cnpj,fil){
+function filialRowHtml(cnpj,fil,uf){
   var idx=(_fidx++);
   return '<div class="filial-row" data-idx="'+idx+'" style="display:flex;gap:8px;margin-bottom:6px;align-items:center">'+
     '<input type="text" class="ef-fil-cnpj" value="'+esc(cnpj||'')+'" placeholder="00.000.000/0000-00" style="flex:1">'+
     '<input type="text" class="ef-fil-fil" value="'+esc(fil||'')+'" placeholder="FIL" style="width:70px">'+
+    '<input type="text" class="ef-fil-uf" value="'+esc(uf||'')+'" placeholder="UF" maxlength="2" style="width:56px;text-transform:uppercase" title="UF da filial: usada em {filialnome} (MATRIZ / FILIAL TO) e {filialsigla} (MTZ / FL TO)">'+
     '<button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()"><i class="ti ti-x"></i></button>'+
   '</div>';
 }
-function addFilialRow(cnpj,fil){
+function addFilialRow(cnpj,fil,uf){
   var el=document.getElementById('ef-filiais-list');if(!el)return;
-  var div=document.createElement('div');div.innerHTML=filialRowHtml(cnpj,fil);el.appendChild(div.firstChild);
+  var div=document.createElement('div');div.innerHTML=filialRowHtml(cnpj,fil,uf);el.appendChild(div.firstChild);
 }
 function addFiliaisEmLote(){
   var ta=document.getElementById('ef-filiais-lote');if(!ta)return;
   (ta.value||'').split('\n').forEach(function(linha){
     var partes=linha.split(',');if(partes.length<2)return;
-    var cnpj=(partes[0]||'').trim(),fil=(partes[1]||'').trim();
-    if(cnpj)addFilialRow(cnpj,fil);
+    var cnpj=(partes[0]||'').trim(),fil=(partes[1]||'').trim(),uf=(partes[2]||'').trim().toUpperCase();
+    if(cnpj)addFilialRow(cnpj,fil,uf);
   });
   ta.value='';
 }
@@ -1548,10 +1845,10 @@ function showEmpForm(k){
     '<div class="card">'+
       '<div class="field"><label>Nome / Razão social</label><input type="text" id="ef-nome" value="'+esc(e.nome||'')+'"></div>'+
       '<div class="field"><label>Filiais (CNPJ + código FIL usado no Domínio/Winthor) <span style="font-weight:300;color:#aaa;font-size:11px">— uma linha por filial; empresas com uma filial só, use uma linha</span></label>'+
-        '<div id="ef-filiais-list">'+(fs.length?fs.map(function(f){return filialRowHtml(f.cnpj,f.fil);}).join(''):filialRowHtml('',''))+'</div>'+
+        '<div id="ef-filiais-list">'+(fs.length?fs.map(function(f){return filialRowHtml(f.cnpj,f.fil,f.uf);}).join(''):filialRowHtml('',''))+'</div>'+
         '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="addFilialRow()"><i class="ti ti-plus"></i> Adicionar filial</button>'+
       '</div>'+
-      '<div class="field"><label style="font-weight:300;color:#aaa;font-size:11px">Colar várias de uma vez (uma por linha: CNPJ, FIL)</label>'+
+      '<div class="field"><label style="font-weight:300;color:#aaa;font-size:11px">Colar várias de uma vez (uma por linha: CNPJ, FIL, UF)</label>'+
         '<textarea id="ef-filiais-lote" rows="2" placeholder="35.397.417/0001-14, 1&#10;35.397.417/0002-95, 3" style="font-size:11px"></textarea>'+
         '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="addFiliaisEmLote()"><i class="ti ti-corner-down-left"></i> Adicionar da lista acima</button>'+
       '</div>'+
@@ -1574,6 +1871,7 @@ function showEmpForm(k){
       '<div id="ef-mapa-man">'+buildMapaManual(e.mapeamento||{})+'</div>'+
       '<div class="sep"></div><div class="section-title">Mapeamento PIS/COFINS <span style="font-weight:300;color:#aaa;font-size:11px">(1 lançamento por linha do Resumo de Apuração, separando PIS e COFINS — {mesano} vira o mês/ano do arquivo, ex.: 07/2026)</span></div>'+
       '<div id="ef-mapa-pc">'+buildMapaPC(e.mapeamento||{})+'</div>'+
+      buildDeprForm(e)+
       '<div style="display:flex;gap:8px;margin-top:1rem">'+
         '<button class="btn btn-primary" onclick="salvarEmp(\''+esc(k||'')+'\')"><i class="ti ti-check"></i> Salvar</button>'+
         '<button class="btn btn-secondary" onclick="document.getElementById(\'emp-form\').innerHTML=\'\'"><i class="ti ti-x"></i> Cancelar</button>'+
@@ -1601,7 +1899,7 @@ function tipoCard(key,label,hist,deb,cred,ativo){
     '<div class="tipo-body" id="tc-body-'+id+'">'+
       (padrao?'<button class="btn btn-secondary btn-sm" style="margin-bottom:8px" onclick="event.stopPropagation();usarPadrao(\''+id+'\')"><i class="ti ti-refresh"></i> Usar padrão (conta confirmada c/ Winthor real)</button>':'')+
       '<div class="field"><label>Rótulo</label><input type="text" id="tc-lbl-'+id+'" value="'+esc(label)+'" onchange="updateContas(\''+id+'\')"></div>'+
-      '<div class="field"><label>Histórico completo <span style="font-weight:300;color:#aaa;font-size:11px">(use {nota}, {mesano}, {filiallabel} se necessário — ex.: MTZ, FL 003)</span></label>'+
+      '<div class="field"><label>Histórico completo <span style="font-weight:300;color:#aaa;font-size:11px">(use {nota}, {mesano}, {filiallabel} (MTZ / FL 003), {filialnome} (MATRIZ / FILIAL TO) ou {filialsigla} (MTZ / FL TO))</span></label>'+
         '<textarea id="tc-hist-'+id+'" rows="3">'+esc(hist)+'</textarea></div>'+
       '<div class="grid2">'+
         '<div class="field"><label>Conta Débito <span style="font-weight:300;color:#aaa;font-size:11px">(cód. reduzido — Winthor: coluna CODIGO RED da linha D)</span></label><input type="text" id="tc-deb-'+id+'" value="'+esc(deb||'')+'" onchange="updateContas(\''+id+'\')"></div>'+
@@ -1625,10 +1923,16 @@ function updateContas(id){
   var c=(document.getElementById('tc-cred-'+id)||{}).value||'—';
   var el=document.getElementById('tc-contas-'+id);if(el)el.textContent='D: '+d+' / C: '+c;
 }
+/* Tipo extra de ICMS = qualquer chave do mapeamento que não seja padrão, manual, PIS/COFINS ou configuração */
+function ehExtraIcms(k,v){
+  if(!v||typeof v!=='object'||Array.isArray(v))return false;
+  if(k.charAt(0)==='_'||k==='cod_h'||PKEYS.indexOf(k)>-1||PCKEYS.indexOf(k)>-1)return false;
+  return k.indexOf('manual_')!==0&&k.indexOf('pcextra_')!==0;
+}
 function buildMapaDom(mapa){
   _tidx=0;var html='<div id="tipos-lista">';
   PADRAO.forEach(function(t){var m=mapa[t.key]||{};html+=tipoCard(t.key,m.label||t.label,m.hist||t.hist,m.deb||t.deb,m.cred||t.cred,m.ativo!==false);});
-  Object.keys(mapa).forEach(function(k){if(k.indexOf('extra_')===0){var m=mapa[k];html+=tipoCard(k,m.label||k,m.hist||'',m.deb||'',m.cred||'',m.ativo!==false);}});
+  Object.keys(mapa).forEach(function(k){if(ehExtraIcms(k,mapa[k])){var m=mapa[k];html+=tipoCard(k,m.label||k,m.hist||'',m.deb||'',m.cred||'',m.ativo!==false);}});
   return html+'</div><button class="btn btn-secondary btn-sm" style="margin-top:.5rem" onclick="addTipoExtra()"><i class="ti ti-plus"></i> Adicionar tipo extra</button>';
 }
 function addTipoExtra(){var l=document.getElementById('tipos-lista');if(!l)return;var div=document.createElement('div');div.innerHTML=tipoCard('extra_'+Date.now(),'Novo tipo','','','',true);l.appendChild(div.firstChild);}
@@ -1659,7 +1963,8 @@ function salvarEmp(k){
   document.querySelectorAll('#ef-filiais-list .filial-row').forEach(function(row){
     var cnpjV=((row.querySelector('.ef-fil-cnpj')||{}).value||'').trim();
     var filV=((row.querySelector('.ef-fil-fil')||{}).value||'').trim();
-    if(cnpjV)filiais.push({cnpj:cnpjV,fil:filV||'1'});
+    var ufV=((row.querySelector('.ef-fil-uf')||{}).value||'').trim().toUpperCase();
+    if(cnpjV)filiais.push(ufV?{cnpj:cnpjV,fil:filV||'1',uf:ufV}:{cnpj:cnpjV,fil:filV||'1'});
   });
   if(!nome||!filiais.length){st.textContent='Preencha o nome e ao menos uma filial (CNPJ).';st.className='status-msg err';return;}
   var cnpjsNorm=filiais.map(function(f){return normCnpj(f.cnpj);});
@@ -1682,6 +1987,10 @@ function salvarEmp(k){
     mapa[key]={label:(document.getElementById('tc-lbl-'+id)||{}).value||key,hist:(document.getElementById('tc-hist-'+id)||{}).value||'',deb:(document.getElementById('tc-deb-'+id)||{}).value||'',cred:(document.getElementById('tc-cred-'+id)||{}).value||'',ativo:!!(document.getElementById('tc-ativo-'+id)||{}).checked};
   });
   mapa.cod_h=(document.getElementById('wt-codh')||{}).value||'';
+  /* mantém configurações que não aparecem como cards (ex.: _estrutura) */
+  var mapaAntes=(k&&db.empresas[k]&&db.empresas[k].mapeamento)||{};
+  Object.keys(mapaAntes).forEach(function(x){if(x.charAt(0)==='_'&&!(x in mapa))mapa[x]=mapaAntes[x];});
+  mapa._depreciacao=lerDeprForm();
   var id=k||docId(normCnpj(filiais[0].cnpj)||'emp_'+Date.now());
   st.textContent='Salvando…';st.className='status-msg';
   var antes=db.empresas[id];
