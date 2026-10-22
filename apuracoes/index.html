@@ -133,7 +133,7 @@ var PADRAO=[
   {key:'estorno_interestadual',label:'ESTORNO — crédito interestadual (red. base cálculo)',hist:'ESTORNO DO CRÉDITO APROV. EM PERC. SUPERIOR AO ESTABELECIDO PARA OPER. INTERESTADUAL, EM FUNÇÃO DA RED. DE B. DE CÁLCULO OU DO CRÉDITO OUTORGADO PREVISTOS, NOS ARTS. 8º, VIII, E 11, III, DO ANEXO IX DO RCTE. IN 1.237/15-GSF - ARTS. 1º, II, A E 2º, I, A.',deb:'1366',cred:'172'},
   {key:'estorno_interna',label:'ESTORNO — crédito interna (red. base de cálculo)',hist:'ESTORNO DO CRÉDITO APROVEITADO EM PERC. SUPERIOR AO ESTABELECIDO NA LEGISLAÇÃO PARA OPER. INTERNA, EM FUNÇÃO DA RED. DA B. DE CÁLCULO OU DO CRÉDITO OUTORGADO PREVISTOS, NOS ARTS. 8º, VIII, E 11, III, DO ANEXO IX DO RCTE. IN 1.237/15-GSF - ARTS. 1º, II, B E 2º, I, B.',deb:'1366',cred:'172'},
   {key:'cr_out_atacadista',label:'CR. OUT. — crédito outorgado atacadista 3% interestadual',hist:'CR. OUT. AO COMERCIANTE ATACADISTA EQUIVALENTE A 3% NA SAÍDA INTERESTADUAL, EXCETO EM TRANSFERÊNCIA, DE MERCADORIA PARA COMERCIALIZAÇÃO, PRODUÇÃO OU INDUSTRIALIZAÇÃO. - RCTE - ART. 11, III - ANEXO IX',deb:'30',cred:'1368'},
-  {key:'outros_creditos',label:'OUTROS CRÉDITOS — campo 006 da apuração (a transportar/aproveitar)',hist:'CREDITOS NA APURAÇÃO DE ICMS SAFRA {filiallabel} - COMPT. {mesano}',deb:'20014',cred:'10032'},
+  {key:'outros_creditos',label:'CRÉDITOS NA APURAÇÃO — 010 se houver imposto a recolher (013); 004 se houver saldo credor (014)',hist:'CREDITOS NA APURAÇÃO DE ICMS SAFRA {filiallabel} - COMPT. {mesano}',deb:'20014',cred:'10032'},
   {key:'apuracao',label:'APURAÇÃO — saldo devedor ICMS (campo 013)',hist:'APURAÇÃO DE ICMS {mesano}',deb:'172',cred:'30'}
 ];
 var PKEYS=PADRAO.map(function(t){return t.key;});
@@ -905,10 +905,13 @@ function parsePdfLines(lines){
       }
     });
   }
-  var v005=valorNaLinha(lines,/005\s*-\s*Por\s*Entradas\/Aquisi[cç][oõ]es\s*Com\s*Cr[eé]dito/i);
-  if(!isNaN(v005)&&v005>0)lanc.push({tipo:'outros_creditos',valor:v005,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{mesano:mesano}});
   var v013=valorNaLinha(lines,/013\s*-\s*Imposto\s*a\s*Recolher/i);
   if(isNaN(v013))v013=valorNaLinha(lines,/011\s*-\s*Saldo\s*Devedor/i);
+  /* Créditos na apuração: com imposto a recolher (013 > 0) lança o 010 (total dos créditos);
+     com saldo credor (014) ou saldo zerado lança o 004 (subtotal dos débitos). */
+  var v004=valorNaLinha(lines,/004\s*-\s*SUB\s*-?\s*TOTAL/i),v010=valorNaLinha(lines,/010\s*-\s*TOTAL/i);
+  var vCred=(!isNaN(v013)&&v013>0)?v010:v004;
+  if(!isNaN(vCred)&&vCred>0)lanc.push({tipo:'outros_creditos',valor:vCred,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{mesano:mesano},origem:(!isNaN(v013)&&v013>0)?'010':'004'});
   if(!isNaN(v013)&&v013>0)lanc.push({tipo:'apuracao',valor:v013,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{mesano:mesano}});
 
   /* Demais itens discriminados (002/003/006/007/012) que a leitura fixa acima não usou:
@@ -916,7 +919,7 @@ function parsePdfLines(lines){
   var itens=itensDiscriminados(lines).filter(function(it){return !blocoJaLido(it.secao,it.texto);});
   var v014=valorNaLinha(lines,/014\s*-\s*Saldo\s*Credor/i);
   return {mesano:mesano,cnpj:extrairCnpj(joined),lancamentos:lanc,itens:itens,
-    resumo:{v013:isNaN(v013)?null:v013,v014:isNaN(v014)?null:v014}};
+    resumo:{v004:isNaN(v004)?null:v004,v010:isNaN(v010)?null:v010,v013:isNaN(v013)?null:v013,v014:isNaN(v014)?null:v014}};
 }
 /* Lê os itens de cada seção discriminada do livro, parando no campo seguinte (0xx - ...).
    Funciona com o livro da Domínio e com o do SAAM (onde o 002 vazio não tem linha de total). */
@@ -1038,7 +1041,8 @@ function blocoLivro(a,e){
     auto.semRegra.map(function(it){return'<div style="font-size:11px">'+esc(it.secao)+' · '+esc(NOMES[it.secao]||'')+' — '+esc(it.texto.slice(0,110))+' — <strong>R$ '+fmtValorBR(it.valor)+'</strong></div>';}).join('')+
     '<div style="font-size:11px">Para lançar sozinho nos próximos meses, cadastre em Empresas um tipo com esse histórico.</div></div>';
   var r=a.resumo||{};
-  if(r.v013!==null&&r.v013!==undefined||r.v014)html+='<div style="font-size:11px;color:#5F5E5A;margin-top:6px">Livro: 013 Imposto a recolher <strong>R$ '+fmtValorBR(r.v013||0)+'</strong>'+(r.v014?' · 014 Saldo credor a transportar <strong>R$ '+fmtValorBR(r.v014)+'</strong>':'')+'</div>';
+  if(r.v013!==null&&r.v013!==undefined||r.v014)html+='<div style="font-size:11px;color:#5F5E5A;margin-top:6px">Livro: 004 Subtotal débitos <strong>R$ '+fmtValorBR(r.v004||0)+'</strong> · 010 Total créditos <strong>R$ '+fmtValorBR(r.v010||0)+'</strong> · 013 Imposto a recolher <strong>R$ '+fmtValorBR(r.v013||0)+'</strong>'+(r.v014?' · 014 Saldo credor <strong>R$ '+fmtValorBR(r.v014)+'</strong>':'')+
+    '<br>Créditos na apuração: '+((r.v013||0)>0?'há imposto a recolher, usa o <strong>010</strong>':'há saldo credor ou saldo zero, usa o <strong>004</strong>')+'.</div>';
   return html;
 }
 function blocoManuais(a,e){
