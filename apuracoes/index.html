@@ -1232,8 +1232,60 @@ function setManualPC(id,key,val){
   if(isNaN(v)||v===0)delete a.manuais[key];else a.manuais[key]=v;
   renderPreviewPC();
 }
+/* Valores lidos da planilha que o usuário corrigiu na prévia (Winthor: 4E, Safra...).
+   a.editados[índice] = novo valor; 0 tira a linha; negativo inverte Débito/Crédito. */
+function pcEditavel(e){return!!e&&e.sistema==='winthor';}
+function setEditadoPC(id,idx,val){
+  var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.editados=a.editados||{};
+  var s=String(val||'').trim(),orig=((a.lancamentos||[])[idx]||{}).valor;
+  if(!s){delete a.editados[idx];renderPreviewPC();return;}
+  var v=parseValorManual(s);
+  if(isNaN(v)){renderPreviewPC();return;}
+  v=Math.round(v*100)/100;
+  if(orig!==undefined&&Math.abs(v-orig)<0.005)delete a.editados[idx];else a.editados[idx]=v;
+  renderPreviewPC();
+}
+function restaurarEditadosPC(id){
+  var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.editados={};renderPreviewPC();
+}
+function lancsLidosPC(a,e){
+  var ed=pcEditavel(e)&&a.editados?a.editados:null,out=[];
+  (a.lancamentos||[]).forEach(function(l,i){
+    if(!ed||!(i in ed)){out.push(l);return;}
+    var v=ed[i];if(!v)return;
+    var c={};for(var k in l)c[k]=l[k];
+    c.valor=Math.abs(v);c.inverter=v<0;c.editado=true;out.push(c);
+  });
+  return out;
+}
+function blocoEditaveisPC(a,e){
+  if(!pcEditavel(e)||a.manualOnly||!(a.lancamentos||[]).length)return'';
+  var tiposMap={};getTiposPC(e).forEach(function(t){tiposMap[t.key]=t;});
+  a.editados=a.editados||{};
+  var nEd=Object.keys(a.editados).length;
+  return '<div style="margin-top:10px;padding:10px 12px;border:0.5px solid #D3D1C7;border-radius:8px;background:#FAFAF8">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+      '<div style="font-size:12px;font-weight:500"><i class="ti ti-edit"></i> PIS/COFINS lidos da planilha — edite se precisar</div>'+
+      (nEd?'<button type="button" class="btn btn-secondary btn-sm" onclick="restaurarEditadosPC(\''+a.id+'\')"><i class="ti ti-arrow-back-up"></i> Restaurar valores da planilha ('+nEd+')</button>':'')+
+    '</div>'+
+    a.lancamentos.map(function(l,i){
+      var t=tiposMap[l.tipo]||{label:l.tipo},ed=(i in a.editados),v=ed?a.editados[i]:l.valor;
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:180px;font-size:12px">'+esc(t.label)+
+          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+
+          (ed?' <span style="color:#B26A00;font-weight:500">· editado (planilha: '+fmtValorBR(l.valor)+')'+(v===0?' — não será lançado':'')+'</span>':'')+'</div></div>'+
+        '<input type="text" inputmode="decimal" aria-label="Valor '+esc(t.label)+'" value="'+fmtValorBR(v)+'" '+
+          'onchange="setEditadoPC(\''+a.id+'\','+i+',this.value)" '+
+          'style="width:140px;height:32px;padding:0 10px;border:0.5px solid '+(ed?'#F0A030':'#D3D1C7')+';border-radius:8px;font-size:13px;text-align:right'+(ed?';background:#FFF8EC':'')+'">'+
+      '</div>';
+    }).join('')+
+    '<div style="font-size:10px;color:#888">Apague o campo para voltar ao valor da planilha. 0 tira a linha; valor negativo inverte Débito e Crédito.</div>'+
+  '</div>';
+}
 function lancsComManuaisPC(a,e){
-  var out=(a.lancamentos||[]).slice();
+  var out=lancsLidosPC(a,e);
   if(!a.manuais||!a.mesano)return out;
   var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
   var dd=String(new Date(yy,mm,0).getDate()).padStart(2,'0'),ms=String(mm).padStart(2,'0');
@@ -1651,7 +1703,7 @@ function renderPreviewPC(){
           (linhas.length>8?'<tr><td colspan="5" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-8)+' linhas</td></tr>':'')+'</table>';
       }
     }
-    if(e&&!a.duplicado&&filialResolvida)body+=blocoManuaisPC(a,e);
+    if(e&&!a.duplicado&&filialResolvida)body+=blocoEditaveisPC(a,e)+blocoManuaisPC(a,e);
     return '<div class="card">'+head+empBlock+body+'</div>';
   }).join('');
   if(prevEl)prevEl.innerHTML=html;
