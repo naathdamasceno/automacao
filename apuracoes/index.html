@@ -737,11 +737,12 @@ function paneApuracao(){
 
 function setupDrop(){
   var drop=document.getElementById('drop'),inp=document.getElementById('pdf-in');
-  if(!drop||!inp)return;
+  if(!drop||!inp||drop.getAttribute('data-ok'))return; /* liga os eventos uma vez só (sTab chama de novo a cada troca de aba) */
+  drop.setAttribute('data-ok','1');
   ['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('over');});});
   drop.addEventListener('dragleave',function(e){e.preventDefault();drop.classList.remove('over');});
   drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('over');var fs=e.dataTransfer&&e.dataTransfer.files;if(fs&&fs.length)loadPdfs(fs);});
-  inp.addEventListener('change',function(){if(inp.files&&inp.files.length)loadPdfs(inp.files);});
+  inp.addEventListener('change',function(){if(inp.files&&inp.files.length)loadPdfs(inp.files);inp.value='';});
 }
 
 /* Reconstrói as linhas do PDF respeitando a posição (x,y) de cada item, em vez de apenas
@@ -1299,11 +1300,12 @@ function panePisCofins(){
 }
 function setupDropPC(){
   var drop=document.getElementById('drop-pc'),inp=document.getElementById('xlsx-pc-in');
-  if(!drop||!inp)return;
+  if(!drop||!inp||drop.getAttribute('data-ok'))return; /* liga os eventos uma vez só */
+  drop.setAttribute('data-ok','1');
   ['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('over');});});
   drop.addEventListener('dragleave',function(e){e.preventDefault();drop.classList.remove('over');});
   drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('over');var fs=e.dataTransfer&&e.dataTransfer.files;if(fs&&fs.length)loadXlsxPC(fs);});
-  inp.addEventListener('change',function(){if(inp.files&&inp.files.length)loadXlsxPC(inp.files);});
+  inp.addEventListener('change',function(){if(inp.files&&inp.files.length)loadXlsxPC(inp.files);inp.value='';});
 }
 /* Identifica a que "tipo" (linha do resumo) uma descrição corresponde, tolerando maiúsc./acentos */
 function detectarBasePisCofins(descNorm){
