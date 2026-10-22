@@ -777,7 +777,7 @@ function readOnePdf(file){
           var lines=[];cs.forEach(function(c){lines=lines.concat(linesFromContent(c));});
           var parsed=parsePdfLines(lines);
           var match=matchEmpresaByCnpj(parsed.cnpj);
-          resolve({nome:file.name,mesano:parsed.mesano,cnpj:parsed.cnpj,lancamentos:parsed.lancamentos,empresaKey:match?match.key:null,filial:match?match.fil:null});
+          resolve({nome:file.name,mesano:parsed.mesano,cnpj:parsed.cnpj,lancamentos:parsed.lancamentos,itens:parsed.itens,resumo:parsed.resumo,empresaKey:match?match.key:null,filial:match?match.fil:null});
         });
       }).catch(function(err){resolve({nome:file.name,erro:err.message});});
     };
@@ -911,7 +911,59 @@ function parsePdfLines(lines){
   if(isNaN(v013))v013=valorNaLinha(lines,/011\s*-\s*Saldo\s*Devedor/i);
   if(!isNaN(v013)&&v013>0)lanc.push({tipo:'apuracao',valor:v013,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{mesano:mesano}});
 
-  return {mesano:mesano,cnpj:extrairCnpj(joined),lancamentos:lanc};
+  /* Demais itens discriminados (002/003/006/007/012) que a leitura fixa acima não usou:
+     ficam guardados para casar com as regras cadastradas da empresa (ver itensAutoDoLivro). */
+  var itens=itensDiscriminados(lines).filter(function(it){return !blocoJaLido(it.secao,it.texto);});
+  var v014=valorNaLinha(lines,/014\s*-\s*Saldo\s*Credor/i);
+  return {mesano:mesano,cnpj:extrairCnpj(joined),lancamentos:lanc,itens:itens,
+    resumo:{v013:isNaN(v013)?null:v013,v014:isNaN(v014)?null:v014}};
+}
+/* Lê os itens de cada seção discriminada do livro, parando no campo seguinte (0xx - ...).
+   Funciona com o livro da Domínio e com o do SAAM (onde o 002 vazio não tem linha de total). */
+function itensDiscriminados(lines){
+  var out=[],secRe=/^(0\d\d)\s*-\s*/,itemRe=/^(\d{1,3})\s*-\s*/;
+  var alvo={'002':1,'003':1,'006':1,'007':1,'012':1},sec=null,cur=null;
+  function fecha(){if(cur){var v=lastCurrencyInLine(cur.text);if(!isNaN(v)&&v>0)out.push({secao:cur.secao,texto:cur.text.replace(itemRe,'').replace(/\s*\d{1,3}(?:\.\d{3})*,\d{2}\s*$/,'').replace(/\s+/g,' ').trim(),valor:v});cur=null;}}
+  lines.forEach(function(l){
+    var t=String(l).trim(),ms=t.match(secRe);
+    if(ms&&!/^0\d\d\s*-\s*\d/.test(t)){fecha();sec=alvo[ms[1]]?ms[1]:null;return;}
+    if(!sec)return;
+    if(/^Total\b/i.test(t)){fecha();return;}
+    var mi=t.match(itemRe);
+    if(mi){fecha();cur={secao:sec,text:t};}
+    else if(cur)cur.text+=' '+t;
+  });
+  fecha();
+  return out;
+}
+/* Mesmos critérios da leitura fixa, para não lançar o mesmo item duas vezes */
+function blocoJaLido(secao,texto){
+  if(secao==='002')return /diferen[cç]a\s+de\s+al[ií]quotas/i.test(texto);
+  if(secao==='003')return (/CTE\s*-\s*Art\.\s*62/i.test(texto)&&/benef/i.test(texto))||/oper\.\s*interestadual/i.test(texto)||/oper\.\s*interna/i.test(texto);
+  if(secao==='006')return /Cr\.\s*out\./i.test(texto);
+  return false;
+}
+function normHist(s){
+  return String(s||'').replace(/\{[^}]*\}/g,' ').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+}
+/* Casa cada item do livro com a regra da empresa cujo histórico aparece no texto do item.
+   Devolve {lancs:[...], semRegra:[...]} */
+function itensAutoDoLivro(a,e){
+  var res={lancs:[],semRegra:[]};if(!a.itens||!a.itens.length||!e)return res;
+  var regras=getTipos(e).filter(function(t){
+    return t.ativo&&t.deb&&t.cred&&PKEYS.indexOf(t.key)===-1&&t.key.indexOf('pcextra_')!==0&&t.key.charAt(0)!=='_'&&typeof t.hist==='string';
+  }).map(function(t){var n=normHist(t.hist);return{t:t,n:n.slice(0,60)};}).filter(function(r){return r.n.length>=15;});
+  var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
+  var dd=String(new Date(yy,mm,0).getDate()).padStart(2,'0'),ms=String(mm).padStart(2,'0');
+  a.itens.forEach(function(it){
+    var txt=normHist(it.texto),melhor=null;
+    regras.forEach(function(r){if(txt.indexOf(r.n)>=0&&(!melhor||r.n.length>melhor.n.length))melhor=r;});
+    if(!melhor){res.semRegra.push(it);return;}
+    var nota=(it.texto.match(/Nota\s*N[oº°]?\.?:?\s*(\d+)/i)||[])[1]||'';
+    res.lancs.push({tipo:melhor.t.key,valor:it.valor,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano,nota:nota},auto:true});
+  });
+  return res;
 }
 
 /* Placeholders por filial: {filialnome} = MATRIZ / FILIAL TO · {filialsigla} = MTZ / FL TO
@@ -964,6 +1016,7 @@ function setManual(id,key,val){
 /* Lançamentos lidos do PDF + os digitados manualmente para este arquivo */
 function lancsComManuais(a,e){
   var out=(a.lancamentos||[]).slice();
+  if(a.mesano)out=out.concat(itensAutoDoLivro(a,e).lancs);
   if(!a.manuais||!a.mesano)return out;
   var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
   var ld=new Date(yy,mm,0).getDate();
@@ -975,8 +1028,22 @@ function lancsComManuais(a,e){
   });
   return out;
 }
+/* Resumo do que foi lido do livro: itens sem regra cadastrada e saldo do período */
+function blocoLivro(a,e){
+  if(a.manualOnly)return'';
+  var html='',auto=itensAutoDoLivro(a,e);
+  var NOMES={'002':'Outros débitos','003':'Estorno de créditos','006':'Outros créditos','007':'Estorno de débitos','012':'Deduções'};
+  if(auto.lancs.length)html+='<div class="alert alert-ok" style="margin-top:8px"><i class="ti ti-check"></i><span>'+auto.lancs.length+' item(ns) discriminado(s) no livro casaram com regras da empresa e já estão na prévia.</span></div>';
+  if(auto.semRegra.length)html+='<div class="alert alert-info" style="margin-top:8px;flex-direction:column;align-items:flex-start;gap:4px"><div><i class="ti ti-info-circle"></i> Itens do livro <strong>sem regra cadastrada</strong> (não lançados):</div>'+
+    auto.semRegra.map(function(it){return'<div style="font-size:11px">'+esc(it.secao)+' · '+esc(NOMES[it.secao]||'')+' — '+esc(it.texto.slice(0,110))+' — <strong>R$ '+fmtValorBR(it.valor)+'</strong></div>';}).join('')+
+    '<div style="font-size:11px">Para lançar sozinho nos próximos meses, cadastre em Empresas um tipo com esse histórico.</div></div>';
+  var r=a.resumo||{};
+  if(r.v013!==null&&r.v013!==undefined||r.v014)html+='<div style="font-size:11px;color:#5F5E5A;margin-top:6px">Livro: 013 Imposto a recolher <strong>R$ '+fmtValorBR(r.v013||0)+'</strong>'+(r.v014?' · 014 Saldo credor a transportar <strong>R$ '+fmtValorBR(r.v014)+'</strong>':'')+'</div>';
+  return html;
+}
 function blocoManuais(a,e){
   var ts=tiposManuais(e);if(!ts.length)return'';
+  var autoPorTipo={};if(a.mesano)itensAutoDoLivro(a,e).lancs.forEach(function(l){autoPorTipo[l.tipo]=(autoPorTipo[l.tipo]||0)+l.valor;});
   if(!a.mesano)return'<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Competência não encontrada no PDF — não é possível lançar valores manuais.</span></div>';
   a.manuais=a.manuais||{};
   return '<div style="margin-top:10px;padding:10px 12px;border:0.5px dashed #0AE18C;border-radius:8px;background:#F7FDFA">'+
@@ -984,9 +1051,11 @@ function blocoManuais(a,e){
     ts.map(function(t){
       var v=a.manuais[t.key];
       var falta=!t.deb||!t.cred;
+      var lidos=autoPorTipo[t.key];
       return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
         '<div style="flex:1;min-width:180px;font-size:12px">'+esc(t.label)+
-          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+'</div></div>'+
+          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+
+          (lidos?' <span style="color:#00682F;font-weight:500">· lido do PDF: '+fmtValorBR(lidos)+' (já incluído; só digite se houver valor a mais)</span>':'')+'</div></div>'+
         '<input type="text" inputmode="decimal" placeholder="0,00" value="'+(v?fmtValorBR(v):'')+'" '+
           'onchange="setManual(\''+a.id+'\',\''+esc(t.key)+'\',this.value)" '+
           'style="width:140px;height:32px;padding:0 10px;border:0.5px solid #D3D1C7;border-radius:8px;font-size:13px;text-align:right">'+
@@ -1281,8 +1350,8 @@ function renderPreviewAll(){
       if(warns.length&&alertEl)warns.forEach(function(w){alertEl.innerHTML+='<div class="alert alert-warn"><i class="ti ti-alert-triangle"></i><span>'+esc(e.nome)+' — conta em branco para: <strong>'+esc(w)+'</strong></span></div>';});
       var linhas=e.sistema==='dominio'?linhasDomFor(lancsAll,e,tipos,filialResolvida):linhasWinFor(lancsAll,e,tipos,filialResolvida);
       totalLinhasGeraveis+=linhas.length;
-      if(!lancsAll.length){
-        body='<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px">'+(a.manualOnly?'Digite os valores abaixo.':'Nenhum lançamento (002/006/013) encontrado neste PDF.')+'</div>';
+      if(!linhas.length){
+        body='<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px">'+(a.manualOnly?'Digite os valores abaixo.':'O livro foi lido, mas não há lançamento a gerar com as regras desta empresa (veja o resumo abaixo).')+'</div>';
       } else if(e.sistema==='dominio'){
         body='<table class="preview-table" style="margin-top:8px"><tr><th>Data</th><th>Débito</th><th>Crédito</th><th>Valor</th><th>Histórico</th></tr>'+
           linhas.slice(0,6).map(function(l){return'<tr><td>'+l.dDisp+'</td><td>'+l.deb+'</td><td>'+l.cred+'</td><td>'+l.val.toFixed(2).replace('.',',')+'</td><td>'+esc(l.hist.slice(0,50))+(l.hist.length>50?'…':'')+'</td></tr>';}).join('')+
@@ -1294,7 +1363,7 @@ function renderPreviewAll(){
           (linhas.length>6?'<tr><td colspan="6" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-6)+' linhas</td></tr>':'')+'</table>';
       }
     }
-    if(e&&!a.duplicado&&filialResolvida)body+=blocoManuais(a,e);
+    if(e&&!a.duplicado&&filialResolvida)body+=blocoLivro(a,e)+blocoManuais(a,e);
     return '<div class="card">'+head+empBlock+body+'</div>';
   }).join('');
   if(prevEl)prevEl.innerHTML=html;
