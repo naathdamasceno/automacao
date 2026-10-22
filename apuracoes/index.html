@@ -730,6 +730,7 @@ function paneApuracao(){
   '<div class="preview-wrap" id="prev-card">'+
     '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar as filiais automaticamente pelo CNPJ.</div>'+
   '</div>'+
+  seletorFormato('ap')+
   '<button class="btn btn-primary btn-full" id="btn-gerar" disabled onclick="gerarArquivo()" style="margin-top:.25rem">'+
     '<i class="ti ti-download"></i> Gerar arquivo(s) de importação</button>'+
   '<div class="status-msg" id="apur-st"></div>';
@@ -995,6 +996,55 @@ function blocoManuais(a,e){
   '</div>';
 }
 
+
+/* ═══ Winthor TXT (layout C3 PC Sistemas, largura fixa 279, CRLF) ═══ */
+function txtAscii(s){
+  return String(s===null||s===undefined?'':s).replace(/\r?\n/g,' ').toUpperCase()
+    .replace(/§/g,'S').replace(/º/g,'o').replace(/ª/g,'a').replace(/°/g,'o')
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\x20-\x7E]/g,' ');
+}
+function padE(v,n){var s=String(v===null||v===undefined?'':v);return s.length>=n?s.slice(s.length-n):' '.repeat(n-s.length)+s;}
+function padD(v,n){var s=String(v===null||v===undefined?'':v);return s.length>=n?s.slice(0,n):s+' '.repeat(n-s.length);}
+function linhaTxtC3(r){
+  /* r = ['C3',num,conta,DDMMAAAA,'D'|'C',doc,valor22,codH,hist,'N',_,filial] (mesmo array do XLSX) */
+  return 'C3'+String(r[1]).padStart(10,'0')+padE(r[2],12)+String(r[3])+r[4]+padE(r[5]?r[5]:'',15)+
+    String(r[6])+padE(r[7],4)+padD(txtAscii(r[8]),200)+(r[9]||'N')+'0'+padE(r[11],2)+' ';
+}
+function winRowsParaTxt(rows,cab){
+  var linhas=[padD(String(cab||''),14)].concat(rows.map(linhaTxtC3));
+  return linhas.join('\r\n')+'\r\n';
+}
+/* Cabeçalho (1ª linha) do TXT — cadastro da empresa; padrão igual ao arquivo de referência da 4E */
+var TXT_CAB_PADRAO='0001641';
+function txtCab(e){var c=e&&e.mapeamento&&e.mapeamento.txt_cab;return String(c||TXT_CAB_PADRAO).trim();}
+/* Formato do arquivo Winthor (XLSX ou TXT), escolhido nas abas e lembrado neste navegador */
+var FMT_KEY='apur_fmt_win';
+function formatoWin(){try{return localStorage.getItem(FMT_KEY)==='txt'?'txt':'xlsx';}catch(e){return'xlsx';}}
+function setFormatoWin(v){try{localStorage.setItem(FMT_KEY,v==='txt'?'txt':'xlsx');}catch(e){}
+  document.querySelectorAll('.fmt-win').forEach(function(sel){sel.value=formatoWin();});}
+function seletorFormato(ctx){
+  var f=formatoWin();
+  return '<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin:.25rem 0 .4rem;font-size:12px;color:#5F5E5A">'+
+    '<label for="fmt-win-'+ctx+'">Arquivo Winthor (rotina 2127):</label>'+
+    '<select id="fmt-win-'+ctx+'" class="fmt-win" onchange="setFormatoWin(this.value)" style="height:30px;border:0.5px solid #D3D1C7;border-radius:8px;padding:0 8px;font-size:12px">'+
+      '<option value="xlsx"'+(f==='xlsx'?' selected':'')+'>Excel (.xlsx)</option><option value="txt"'+(f==='txt'?' selected':'')+'>Texto (.txt)</option></select></div>';
+}
+/* Salva as linhas Winthor no formato escolhido. Em TXT sai um arquivo por empresa (cada uma com o seu cabeçalho). */
+function salvarWinthor(prefixo,aba,my,grupos){
+  var ks=Object.keys(grupos).filter(function(k){return grupos[k].length;});if(!ks.length)return 0;
+  if(formatoWin()==='txt'){
+    ks.forEach(function(k){
+      var e=db.empresas[k];
+      saveFile(prefixo+'_WINTHOR_'+normCnpj((e&&e.cnpj)||k)+'_'+my+'.txt',winRowsParaTxt(grupos[k],txtCab(e)));
+    });
+    return ks.length;
+  }
+  var rows=[];ks.forEach(function(k){rows=rows.concat(grupos[k]);});
+  var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:6},{wch:8},{wch:12},{wch:10},{wch:10},{wch:12},{wch:24},{wch:7},{wch:55},{wch:11},{wch:3},{wch:7}];
+  XLSX.utils.book_append_sheet(wb,ws,aba);
+  saveXlsx(wb,prefixo+'_WINTHOR_'+my+'.xlsx');return 1;
+}
 
 /* ═══════ EXCLUIR / SUBSTITUIR / LIMPAR ARQUIVOS CARREGADOS ═══════
    ctx: 'ap' = Apuração (PDF), 'pc' = PIS/COFINS (planilha), 'dp' = Depreciação (PDF) */
@@ -1302,7 +1352,7 @@ function gerarArquivo(){
   marcarDuplicados();
   var mesano='';arquivos.forEach(function(a){if(!mesano&&a.mesano)mesano=a.mesano;});
   var my=mesano?mesano.replace('/','_'):'export';
-  var winRows=[],domGroups={},pendentes=0,duplicados=0;
+  var winGrupos={},domGroups={},pendentes=0,duplicados=0;
   arquivos.forEach(function(a){
     if(a.erro)return;
     if(a.duplicado){duplicados++;return;}
@@ -1311,19 +1361,14 @@ function gerarArquivo(){
     var fil=a.filial||(fs.length===1?fs[0].fil:null);
     if(!fil){pendentes++;return;} /* empresa com múltiplas filiais e nenhuma escolhida ainda */
     if(e.sistema==='winthor'){
-      winRows=winRows.concat(linhasWinFor(lancsComManuais(a,e),e,tipos,fil));
+      winGrupos[a.empresaKey]=(winGrupos[a.empresaKey]||[]).concat(linhasWinFor(lancsComManuais(a,e),e,tipos,fil));
     } else {
       var linhas=linhasDomFor(lancsComManuais(a,e),e,tipos,fil);
       if(linhas.length)domGroups[a.empresaKey]=(domGroups[a.empresaKey]||[]).concat(linhas);
     }
   });
   var gerou=0;
-  if(winRows.length){
-    var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(winRows);
-    ws['!cols']=[{wch:6},{wch:8},{wch:12},{wch:10},{wch:10},{wch:12},{wch:24},{wch:7},{wch:55},{wch:11},{wch:3},{wch:7}];
-    XLSX.utils.book_append_sheet(wb,ws,'ESTADUAIS');
-    saveXlsx(wb,'ICMS_WINTHOR_'+my+'.xlsx');gerou++;
-  }
+  gerou+=salvarWinthor('ICMS','ESTADUAIS',my,winGrupos);
   Object.keys(domGroups).forEach(function(k){
     var e=db.empresas[k],linhas=domGroups[k],codH=(e.mapeamento||{}).cod_h||'';
     linhas.forEach(function(l,i){l.lote=i+1;}); /* renumera o lote sequencialmente caso mais de um PDF do mesmo CNPJ (ex.: meses diferentes) tenha entrado no mesmo lote */
@@ -1355,6 +1400,7 @@ function panePisCofins(){
   '<div class="preview-wrap" id="prev-card-pc">'+
     '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue as planilhas para identificar a empresa automaticamente pelo CNPJ.</div>'+
   '</div>'+
+  seletorFormato('pc')+
   '<button class="btn btn-primary btn-full" id="btn-gerar-pc" disabled onclick="gerarArquivoPC()" style="margin-top:.25rem">'+
     '<i class="ti ti-download"></i> Gerar arquivo(s) de importação</button>'+
   '<div class="status-msg" id="apur-st-pc"></div>';
@@ -1551,7 +1597,7 @@ function gerarArquivoPC(){
   marcarDuplicadosPC();
   var mesano='';arquivosPC.forEach(function(a){if(!mesano&&a.mesano)mesano=a.mesano;});
   var my=mesano?mesano.replace('/','_'):'export';
-  var domGroups={},winRows=[],pendentes=0,duplicados=0;
+  var domGroups={},winGrupos={},pendentes=0,duplicados=0;
   arquivosPC.forEach(function(a){
     if(a.erro)return;
     if(a.duplicado){duplicados++;return;}
@@ -1559,18 +1605,13 @@ function gerarArquivoPC(){
     var e=db.empresas[a.empresaKey],tipos=getTiposPC(e),fs=getFiliais(e);
     var fil=a.filial||(fs.length===1?fs[0].fil:null);
     if(!fil){pendentes++;return;}
-    if(e.sistema==='winthor'){winRows=winRows.concat(linhasWinFor(lancsComManuaisPC(a,e),e,tipos,fil));return;}
+    if(e.sistema==='winthor'){winGrupos[a.empresaKey]=(winGrupos[a.empresaKey]||[]).concat(linhasWinFor(lancsComManuaisPC(a,e),e,tipos,fil));return;}
     var linhas=linhasDomFor(lancsComManuaisPC(a,e),e,tipos,fil);
     if(linhas.length)domGroups[a.empresaKey]=(domGroups[a.empresaKey]||[]).concat(linhas);
   });
   var gerou=0;
-  if(winRows.length){
-    /* mesmo layout do ICMS (rotina 2127 do Winthor) */
-    var wbw=XLSX.utils.book_new(),wsw=XLSX.utils.aoa_to_sheet(winRows);
-    wsw['!cols']=[{wch:6},{wch:8},{wch:12},{wch:10},{wch:10},{wch:12},{wch:24},{wch:7},{wch:55},{wch:11},{wch:3},{wch:7}];
-    XLSX.utils.book_append_sheet(wbw,wsw,'FEDERAIS');
-    saveXlsx(wbw,'PISCOFINS_WINTHOR_'+my+'.xlsx');gerou++;
-  }
+  /* mesmo layout do ICMS (rotina 2127 do Winthor) */
+  gerou+=salvarWinthor('PISCOFINS','FEDERAIS',my,winGrupos);
   Object.keys(domGroups).forEach(function(k){
     var e=db.empresas[k],linhas=domGroups[k],codH=(e.mapeamento||{}).cod_h||'';
     var txt=linhas.map(function(l){return[l.dDisp,l.deb,l.cred,l.val.toFixed(2).replace('.',','),codH,l.hist,'','','',''].join(';');}).join('\r\n');
@@ -1632,6 +1673,7 @@ function paneDepreciacao(){
   '<div class="preview-wrap" id="prev-card-dp">'+
     '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar a empresa pelo CNPJ e montar os lançamentos de depreciação.</div>'+
   '</div>'+
+  seletorFormato('dp')+
   '<button class="btn btn-primary btn-full" id="btn-gerar-dp" disabled onclick="gerarArquivoDP()" style="margin-top:.25rem">'+
     '<i class="ti ti-download"></i> Gerar arquivo(s) de importação Winthor</button>'+
   '<div class="status-msg" id="apur-st-dp"></div>';
@@ -1814,10 +1856,12 @@ function gerarArquivoDP(){
     var x=ctxDP(a);
     if(!x.depr||!x.fil){pendentes++;return;}
     var L=linhasDepr(a,x.depr,x.fil);if(!L.rows.length)return;
+    var my=a.mesano.replace('/','_');
+    if(formatoWin()==='txt'){saveFile('DEPRECIACAO_WINTHOR_'+normCnpj(a.cnpj)+'_'+my+'.txt',winRowsParaTxt(L.rows,txtCab(x.e)));gerou++;return;}
     var ws=XLSX.utils.aoa_to_sheet(L.rows);
     ws['!cols']=[{wch:5},{wch:8},{wch:11},{wch:10},{wch:10},{wch:5},{wch:24},{wch:7},{wch:70},{wch:11},{wch:3},{wch:7}];
     var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'DEPRECIACAO');
-    saveXlsx(wb,'DEPRECIACAO_WINTHOR_'+normCnpj(a.cnpj)+'_'+a.mesano.replace('/','_')+'.xlsx');gerou++;
+    saveXlsx(wb,'DEPRECIACAO_WINTHOR_'+normCnpj(a.cnpj)+'_'+my+'.xlsx');gerou++;
   });
   var el=document.getElementById('apur-st-dp');
   function st(m,t){if(el){el.textContent=m;el.className='status-msg'+(t?' '+t:'');}}
@@ -2122,7 +2166,8 @@ function buildMapaPC(mapa){
 }
 function addTipoExtraPC(){var l=document.getElementById('tipos-lista-pc');if(!l)return;var div=document.createElement('div');div.innerHTML=tipoCard('pcextra_'+Date.now(),'Novo tipo','','','',true);l.appendChild(div.firstChild);}
 function buildCodH(mapa){
-  return '<div class="field" style="max-width:200px"><label>Código de Histórico</label><input type="text" id="wt-codh" value="'+esc(mapa.cod_h||'')+'" placeholder="ex: 24"></div>'+
+  return '<div class="grid2" style="max-width:460px"><div class="field"><label for="wt-codh">Código de Histórico</label><input type="text" id="wt-codh" value="'+esc(mapa.cod_h||'')+'" placeholder="ex: 24"></div>'+
+    '<div class="field"><label for="wt-txtcab">Cabeçalho do TXT Winthor <span style="font-weight:300;color:#aaa;font-size:11px">(1ª linha)</span></label><input type="text" id="wt-txtcab" maxlength="14" value="'+esc(mapa.txt_cab||'')+'" placeholder="'+TXT_CAB_PADRAO+'"></div></div>'+
     '<div class="alert alert-info" style="margin-bottom:8px"><i class="ti ti-info-circle"></i><span>Mesmo código de histórico usado em todos os lançamentos desta empresa (Domínio ou Winthor). As contas débito/crédito de cada tipo de lançamento são configuradas abaixo, por tipo.</span></div>';
 }
 function salvarEmp(k){
@@ -2157,6 +2202,7 @@ function salvarEmp(k){
     mapa[key]={label:(document.getElementById('tc-lbl-'+id)||{}).value||key,hist:(document.getElementById('tc-hist-'+id)||{}).value||'',deb:(document.getElementById('tc-deb-'+id)||{}).value||'',cred:(document.getElementById('tc-cred-'+id)||{}).value||'',ativo:!!(document.getElementById('tc-ativo-'+id)||{}).checked};
   });
   mapa.cod_h=(document.getElementById('wt-codh')||{}).value||'';
+  var txtCabV=((document.getElementById('wt-txtcab')||{}).value||'').trim();if(txtCabV)mapa.txt_cab=txtCabV;
   /* mantém configurações que não aparecem como cards (ex.: _estrutura) */
   var mapaAntes=(k&&db.empresas[k]&&db.empresas[k].mapeamento)||{};
   Object.keys(mapaAntes).forEach(function(x){if(x.charAt(0)==='_'&&!(x in mapa))mapa[x]=mapaAntes[x];});
