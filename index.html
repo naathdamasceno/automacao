@@ -1,0 +1,2348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Apurações · Planning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{color-scheme:light}
+body,input,select,button,textarea{font-family:'Poppins',sans-serif}
+body{background:#F2F2F2;color:#000;min-height:100vh;padding:1.5rem 1rem}
+.wrap{max-width:760px;margin:0 auto}
+h2{font-size:18px;font-weight:700;margin-bottom:4px}
+.sub{font-size:13px;color:#5F5E5A;font-weight:300;margin-bottom:1.25rem}
+.divider{width:32px;height:3px;background:linear-gradient(90deg,#0AE18C,#14C8FA);border-radius:2px;margin-bottom:.75rem}
+.step-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem}
+.section-title{font-size:12px;font-weight:500;color:#5F5E5A;margin-bottom:8px}
+.brand{display:flex;align-items:center;gap:8px;margin-bottom:1.5rem}
+.brand-name{font-size:17px;font-weight:700;color:#000}
+.card{background:#fff;border:0.5px solid #E5E5E5;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.field{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.field label{font-size:12px;color:#5F5E5A}
+.field input,.field select,.field textarea{font-size:13px;padding:0 10px;border:0.5px solid #D3D1C7;border-radius:8px;background:#fff;color:#000;outline:none;transition:border-color .15s}
+.field input,.field select{height:34px}
+.field textarea{padding:8px 10px;resize:vertical;min-height:60px;font-size:11px;line-height:1.6;font-family:monospace}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#0AE18C;box-shadow:0 0 0 3px rgba(10,225,140,.15)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.grid2{grid-template-columns:1fr}}
+.badge{display:inline-block;font-size:10px;padding:2px 9px;border-radius:100px;font-weight:500}
+.badge-edit{background:#C9F7E2;color:#00682F}
+.badge-view{background:#E6F1FB;color:#185FA5}
+.badge-admin{background:#000;color:#0AE18C}
+.btn{font-family:'Poppins',sans-serif;font-size:13px;font-weight:500;border:none;border-radius:8px;padding:.55rem 1.1rem;cursor:pointer;transition:background .15s,color .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:#0AE18C;color:#000}
+.btn-primary:hover{background:#00BF63;color:#fff}
+.btn-primary:disabled{background:#D3D1C7;color:#888;cursor:not-allowed}
+.btn-secondary{background:#F2F2F2;color:#000;border:0.5px solid #D3D1C7}
+.btn-secondary:hover{background:#fff;border-color:#0AE18C}
+.btn-danger{background:#FFE5E5;color:#A32D2D;border:0.5px solid #FF3131}
+.btn-danger:hover{background:#FF3131;color:#fff}
+.btn-full{width:100%;justify-content:center}
+.btn-sm{font-size:11px;padding:.3rem .7rem}
+.alert{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:.6rem;line-height:1.5}
+.alert i{font-size:15px;margin-top:1px;flex-shrink:0}
+.alert-ok{background:#C9F7E2;color:#00682F;border:0.5px solid #00BF63}
+.alert-warn{background:#FFF1D6;color:#854F0B;border:0.5px solid #EF9F27}
+.alert-err{background:#FFE5E5;color:#A32D2D;border:0.5px solid #FF3131}
+.alert-info{background:#E6F1FB;color:#185FA5;border:0.5px solid #90CAF9}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.avatar{width:30px;height:30px;border-radius:50%;background:#000;color:#0AE18C;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.tabs{display:flex;gap:4px;background:#F2F2F2;border:0.5px solid #E0E0E0;border-radius:10px;padding:4px;margin-bottom:1.25rem}
+.tab{flex:1;padding:7px 6px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:500;border:none;border-radius:7px;cursor:pointer;background:transparent;color:#5F5E5A;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px}
+.tab.active{background:#fff;color:#000;border:0.5px solid #E0E0E0}
+.pane{display:none}.pane.active{display:block}
+.drop{border:1.5px dashed #B4B2A9;border-radius:8px;padding:1.75rem 1rem;text-align:center;cursor:pointer;background:#F2F2F2;transition:background .15s,border-color .15s;user-select:none}
+.drop:hover,.drop.over{background:#EAFBF3;border-color:#0AE18C}
+.drop.done{background:#C9F7E2;border-color:#00BF63}
+.drop-label{font-size:13px;color:#5F5E5A}
+.drop-name{font-size:12px;font-weight:500;color:#00BF63;margin-top:.3rem;display:none}
+.emp-item{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border:0.5px solid #E5E5E5;border-radius:10px;background:#fff;margin-bottom:.5rem;transition:border-color .15s}
+.emp-item:hover{border-color:#0AE18C}
+.user-item{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border:0.5px solid #E5E5E5;border-radius:10px;background:#fff;margin-bottom:.5rem;transition:border-color .15s}
+.user-item:hover{border-color:#0AE18C}
+.tipo-card{background:#fff;border:0.5px solid #E5E5E5;border-radius:10px;padding:.7rem 1rem;margin-bottom:.6rem}
+.tipo-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:8px;user-select:none}
+.tipo-label{font-size:12px;font-weight:500;flex:1}
+.tipo-contas{font-size:11px;color:#888;font-family:monospace;margin-top:2px}
+.tipo-body{display:none;margin-top:.75rem;border-top:0.5px solid #F0F0F0;padding-top:.75rem}
+.tipo-body.open{display:block}
+.preview-wrap{overflow-x:auto}
+.preview-table{width:100%;border-collapse:collapse;font-size:11px}
+.preview-table th{background:#000;color:#0AE18C;font-weight:500;padding:4px 6px;text-align:left;white-space:nowrap}
+.preview-table td{padding:3px 6px;border:0.5px solid #EDEDED;font-family:monospace;font-size:10px;color:#333;white-space:nowrap}
+.preview-table tr:nth-child(odd) td{background:#fff}
+.preview-table tr:nth-child(even) td{background:#F8FAF9}
+.status-msg{font-size:12px;text-align:center;margin-top:.5rem;min-height:16px;font-weight:500}
+.status-msg.ok{color:#00BF63}.status-msg.err{color:#FF3131}
+.sep{border:none;border-top:0.5px solid #EDEDED;margin:.75rem 0}
+.sis-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:100px;font-weight:500}
+.sis-w{background:#E8F4FF;color:#1565C0}
+.sis-d{background:#F3E8FF;color:#6A1B9A}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:1rem}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:1.5rem;max-width:580px;width:100%;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:4px}
+.chk-label{display:flex;align-items:center;gap:6px;font-size:12px;color:#5F5E5A;cursor:pointer}
+.chk-label input{accent-color:#0AE18C;width:auto;height:auto}
+.hint-box{background:#C9F7E2;border-radius:8px;padding:8px 12px;font-size:11px;color:#00682F;margin-bottom:10px}
+.modal-actions{display:flex;gap:8px;margin-top:1rem;justify-content:flex-end}
+.mode-note{display:none;font-size:11px;color:#5F5E5A;margin:-0.75rem 0 1rem}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" id="modal-inner"></div>
+</div>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var LOCAL_KEY='apur_v3';
+/* Quem está usando: vem do compartilhamento do Claude (sem login próprio).
+   canEdit = pode alterar empresas/contas na base compartilhada. */
+var ME={canEdit:true,nome:'',modo:'local',login:'',perfil:'',isAdmin:false,isOwner:false,podeGravar:null};
+var PERFIS={
+  admin:       {label:'Administrador',canEdit:true,isAdmin:true},
+  analista:    {label:'Analista',     canEdit:true},
+  especialista:{label:'Especialista', canEdit:true},
+  supervisao:  {label:'Supervisão',   canEdit:true},
+  coordenacao: {label:'Coordenação',  canEdit:true},
+  gerencia:    {label:'Gerência',     canEdit:true},
+  estagiario:  {label:'Estagiário',   canEdit:false},
+  auxiliar:    {label:'Auxiliar',     canEdit:false},
+  assistente:  {label:'Assistente',   canEdit:false}
+};
+var SESS_KEY='apur_sess_v4';
+var usuarios={},usuariosProntos=false,_appIniciado=false,_loginPendente='';
+var SUPA_URL='https://kktcclsvaxwsccvpeini.supabase.co',SUPA_KEY='sb_publishable_nXB8t4W_utGjMVOdchtW4w_Uqb78t0r';
+var sb=supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,storageKey:'apuracoes-auth'}});
+var downloadsCap=null,_canalEmpresas=null;
+
+var PADRAO=[
+  {key:'difal',label:'DIFAL — diferença de alíquotas',hist:'DÉBITO DO MONTANTE DO IMPOSTO CORRESPONDENTE À DIFERENÇA DE ALÍQUOTAS, APURADO NO PRAZO. - RCTE - ART. 73, § 1º, I. NOTA Nº: {nota}',deb:'30125050',cred:'20014'},
+  {key:'benef_fiscal',label:'ESTORNO — crédito com benefício fiscal (CTE art.62)',hist:'ESTORNO, PELO ESTABELEC. REMET., DO IMPOSTO CREDITADO, NA HIPÓTESE EM QUE A SAÍDA SUBSEQ. DA MERCAD. RESULTANTE DO PROCESSO DE INDUSTR. OU DE OUTRO TRATAM., PROMOVIDA PELO ESTABELEC. DEST., TENHA SIDO CONTEMPLADA COM BENEF. FISCAL - CTE - ART. 62, § ÚNICO',deb:'1369',cred:'172'},
+  {key:'estorno_interestadual',label:'ESTORNO — crédito interestadual (red. base cálculo)',hist:'ESTORNO DO CRÉDITO APROV. EM PERC. SUPERIOR AO ESTABELECIDO PARA OPER. INTERESTADUAL, EM FUNÇÃO DA RED. DE B. DE CÁLCULO OU DO CRÉDITO OUTORGADO PREVISTOS, NOS ARTS. 8º, VIII, E 11, III, DO ANEXO IX DO RCTE. IN 1.237/15-GSF - ARTS. 1º, II, A E 2º, I, A.',deb:'1366',cred:'172'},
+  {key:'estorno_interna',label:'ESTORNO — crédito interna (red. base de cálculo)',hist:'ESTORNO DO CRÉDITO APROVEITADO EM PERC. SUPERIOR AO ESTABELECIDO NA LEGISLAÇÃO PARA OPER. INTERNA, EM FUNÇÃO DA RED. DA B. DE CÁLCULO OU DO CRÉDITO OUTORGADO PREVISTOS, NOS ARTS. 8º, VIII, E 11, III, DO ANEXO IX DO RCTE. IN 1.237/15-GSF - ARTS. 1º, II, B E 2º, I, B.',deb:'1366',cred:'172'},
+  {key:'cr_out_atacadista',label:'CR. OUT. — crédito outorgado atacadista 3% interestadual',hist:'CR. OUT. AO COMERCIANTE ATACADISTA EQUIVALENTE A 3% NA SAÍDA INTERESTADUAL, EXCETO EM TRANSFERÊNCIA, DE MERCADORIA PARA COMERCIALIZAÇÃO, PRODUÇÃO OU INDUSTRIALIZAÇÃO. - RCTE - ART. 11, III - ANEXO IX',deb:'30',cred:'1368'},
+  {key:'outros_creditos',label:'CRÉDITOS NA APURAÇÃO — 010 se houver imposto a recolher (013); 004 se houver saldo credor (014)',hist:'CREDITOS NA APURAÇÃO DE ICMS SAFRA {filiallabel} - COMPT. {mesano}',deb:'20014',cred:'10032'},
+  {key:'apuracao',label:'APURAÇÃO — saldo devedor ICMS (campo 013)',hist:'APURAÇÃO DE ICMS {mesano}',deb:'172',cred:'30'}
+];
+var PKEYS=PADRAO.map(function(t){return t.key;});
+
+/* Tipos de lançamento para Resumo de Apuração PIS/COFINS (Excel) — 1 lançamento por linha, separando PIS e COFINS */
+var PADRAO_PC=[
+  {key:'pis_vendas',label:'PIS — Vendas',hist:'PIS S/ VENDAS {mesano}',deb:'429',cred:'179',ativo:true},
+  {key:'cofins_vendas',label:'COFINS — Vendas',hist:'COFINS S/ VENDAS {mesano}',deb:'428',cred:'180',ativo:true},
+  {key:'pis_credito_outorgado',label:'PIS — Crédito Outorgado 3%',hist:'PIS S/ CREDITO OUTORGADO {mesano}',deb:'429',cred:'179',ativo:true},
+  {key:'cofins_credito_outorgado',label:'COFINS — Crédito Outorgado 3%',hist:'COFINS S/ CREDITO OUTORGADO {mesano}',deb:'428',cred:'180',ativo:true},
+  {key:'pis_entrada_bonificacao',label:'PIS — Entrada de Bonificação',hist:'PIS S/ ENTRADA DE BONIFICAÇÃO {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_entrada_bonificacao',label:'COFINS — Entrada de Bonificação',hist:'COFINS S/ ENTRADA DE BONIFICAÇÃO {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_prestacao_servico',label:'PIS — Prestação de serviço',hist:'PIS S/ PRESTAÇÃO DE SERVIÇO {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_prestacao_servico',label:'COFINS — Prestação de serviço',hist:'COFINS S/ PRESTAÇÃO DE SERVIÇO {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_devolucao_compras',label:'PIS — (+) Devolução de Compras',hist:'PIS S/ DEVOLUÇÃO DE COMPRAS {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_devolucao_compras',label:'COFINS — (+) Devolução de Compras',hist:'COFINS S/ DEVOLUÇÃO DE COMPRAS {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_estorno_creditos_estoque',label:'PIS — Estornos de Créditos baixa de estoque',hist:'PIS S/ ESTORNO DE CREDITOS BAIXA DE ESTOQUE {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_estorno_creditos_estoque',label:'COFINS — Estornos de Créditos baixa de estoque',hist:'COFINS S/ ESTORNO DE CREDITOS BAIXA DE ESTOQUE {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_receita_financeira',label:'PIS — Receita Financeira',hist:'PIS S/ RECEITA FINANCEIRA {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_receita_financeira',label:'COFINS — Receita Financeira',hist:'COFINS S/ RECEITA FINANCEIRA {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_compras_comercializacao',label:'PIS — Compras Para Comercialização',hist:'PIS S/ COMPRAS PARA COMERCIALIZAÇÃO {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_compras_comercializacao',label:'COFINS — Compras Para Comercialização',hist:'COFINS S/ COMPRAS PARA COMERCIALIZAÇÃO {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_industrializacao_encomenda',label:'PIS — Produtos Industrialização por encomenda',hist:'PIS S/ INDUSTRIALIZAÇÃO POR ENCOMENDA {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_industrializacao_encomenda',label:'COFINS — Produtos Industrialização por encomenda',hist:'COFINS S/ INDUSTRIALIZAÇÃO POR ENCOMENDA {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_aquisicao_transporte',label:'PIS — Aquisição de Serviço de Transporte',hist:'PIS S/ AQUISIÇÃO DE SERVIÇO DE TRANSPORTE {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_aquisicao_transporte',label:'COFINS — Aquisição de Serviço de Transporte',hist:'COFINS S/ AQUISIÇÃO DE SERVIÇO DE TRANSPORTE {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_devolucao_vendas',label:'PIS — (+) Devolução de Vendas',hist:'PIS S/ DEVOLUÇÃO DE VENDAS {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_devolucao_vendas',label:'COFINS — (+) Devolução de Vendas',hist:'COFINS S/ DEVOLUÇÃO DE VENDAS {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_energia_eletrica',label:'PIS — Energia elétrica',hist:'PIS S/ ENERGIA ELÉTRICA {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_energia_eletrica',label:'COFINS — Energia elétrica',hist:'COFINS S/ ENERGIA ELÉTRICA {mesano}',deb:'',cred:'',ativo:false},
+  {key:'pis_aluguel_imovel',label:'PIS — Aluguel Imóvel PJ',hist:'PIS S/ ALUGUEL IMOVEL PJ {mesano}',deb:'',cred:'',ativo:false},
+  {key:'cofins_aluguel_imovel',label:'COFINS — Aluguel Imóvel PJ',hist:'COFINS S/ ALUGUEL IMOVEL PJ {mesano}',deb:'',cred:'',ativo:false}
+];
+var PCKEYS=PADRAO_PC.map(function(t){return t.key;});
+/* Gera o rótulo de filial usado nos históricos (ex.: filial 1 = "MTZ", filial 3 = "FL 003") */
+function filialLabel(fil){
+  fil=String(fil||'').trim();
+  if(!fil)return'';
+  if(fil==='1')return'MTZ';
+  return'FL '+fil.padStart(3,'0');
+}
+
+/* ═══════ IMPORTAÇÃO/EXPORTAÇÃO DE PARAMETRIZAÇÃO (Excel) ═══════
+   Lê uma planilha no formato Winthor (aba ESTADUAIS: TIPO, NÚMERO, CODIGO RED, DATA,
+   NATUREZA, DOC, COD H, COMPLEMENTO HISTORICO, CONCILIADO, FILIAL, VALOR) e converte em
+   entradas de mapeamento{label,hist,deb,cred,ativo}, reaproveitando a estrutura já usada
+   por getTipos()/buildMapaDom()/salvarEmp(). Não toca na leitura de PDF nem na geração
+   dos arquivos de importação — só alimenta o formulário de Empresas. */
+function slugify(s){
+  var v=String(s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+  return v.slice(0,40)||('tipo_'+Date.now());
+}
+/* Usada só internamente para AGRUPAR linhas que representam o mesmo "tipo" de lançamento
+   (o mesmo histórico varia por filial/mês/nota). O texto normalizado NUNCA é salvo — o
+   campo "hist" gravado é sempre o texto original da planilha, sem alterações. */
+function normalizarParaComparacao(s){
+  var v=String(s||'').toUpperCase().trim();
+  v=v.replace(/\bMTZ\b/g,'{FIL}').replace(/\bFL\s*0*\d+\b/g,'{FIL}');
+  v=v.replace(/\b\d{2}\/\d{4}\b/g,'{MES}');
+  v=v.replace(/(NOTA\s*N[Oº]:\s*)\d+/g,'$1{NOTA}');
+  return v.replace(/\s+/g,' ').trim();
+}
+function detectarChavePadrao(histNorm){
+  if(/DIFEREN[ÇC]A DE AL[IÍ]QUOTAS/.test(histNorm))return'difal';
+  if(/ART\.\s*62/.test(histNorm)&&/BENEF/.test(histNorm))return'benef_fiscal';
+  if(/OPER\.\s*INTERESTADUAL/.test(histNorm)&&/ESTORNO/.test(histNorm))return'estorno_interestadual';
+  if(/OPER\.\s*INTERNA/.test(histNorm)&&/ESTORNO/.test(histNorm))return'estorno_interna';
+  if(/CR\.\s*OUT\./.test(histNorm))return'cr_out_atacadista';
+  if(/APURA[ÇC][ÃA]O DE ICMS/.test(histNorm)&&/SAFRA/.test(histNorm))return'outros_creditos';
+  if(/APURA[ÇC][ÃA]O DE ICMS/.test(histNorm)&&!/SAFRA/.test(histNorm))return'apuracao';
+  return null;
+}
+/* Normaliza um cabeçalho de coluna p/ comparação tolerante (espaços/maiúsculas/acentos) */
+function normHeader(s){
+  return String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+}
+function parseParametrizacaoWorkbook(wb){
+  var sheetName=null;
+  wb.SheetNames.forEach(function(n){if(normHeader(n)==='ESTADUAIS')sheetName=n;});
+  if(!sheetName)return{erro:'Não encontrei a aba "ESTADUAIS" nesta planilha. Abas disponíveis: '+wb.SheetNames.join(', ')+'.'};
+  var ws=wb.Sheets[sheetName];
+  var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  var headerIdx=-1,cols={};
+  /* aceita tanto os cabeçalhos originais do extrato Winthor quanto os da planilha exportada por
+     exportarParametrizacaoExcel(), pra reimportação funcionar nos dois sentidos */
+  var ALIASES={'TIPO':['TIPO'],'CODIGO RED':['CODIGO RED','COD RED','CODIGO REDUZIDO'],'NATUREZA':['NATUREZA'],'COD H':['COD H','CODH'],'COMPLEMENTO HISTORICO':['COMPLEMENTO HISTORICO','HISTORICO']};
+  var canonicos=Object.keys(ALIASES);
+  function achaAlias(rowNorm,canon){for(var a=0;a<ALIASES[canon].length;a++){var ix=rowNorm.indexOf(ALIASES[canon][a]);if(ix>=0)return ix;}return -1;}
+  for(var i=0;i<Math.min(rows.length,10);i++){
+    var r=rows[i].map(normHeader);
+    var achou=canonicos.every(function(h){return achaAlias(r,h)>=0;});
+    if(achou){
+      headerIdx=i;
+      canonicos.forEach(function(h){cols[h]=achaAlias(r,h);});
+      var filIx=r.indexOf('FILIAL');if(filIx>=0)cols['FILIAL']=filIx;
+      break;
+    }
+  }
+  if(headerIdx<0){
+    var faltando=[];
+    canonicos.forEach(function(h){
+      var acheiEmAlguma=false;
+      for(var j=0;j<Math.min(rows.length,10);j++){if(achaAlias(rows[j].map(normHeader),h)>=0)acheiEmAlguma=true;}
+      if(!acheiEmAlguma)faltando.push(h);
+    });
+    return{erro:'Não encontrei as colunas obrigatórias na aba ESTADUAIS: '+(faltando.length?faltando.join(', '):'TIPO, CODIGO RED, NATUREZA, COD H, COMPLEMENTO HISTORICO')+'.'};
+  }
+  var idxTipo=cols['TIPO'],idxCodRed=cols['CODIGO RED'],idxNat=cols['NATUREZA'],idxCodH=cols['COD H'],idxHist=cols['COMPLEMENTO HISTORICO'],idxFil=cols['FILIAL'];
+  var body=rows.slice(headerIdx+1);
+  var pares=[],pendD=null;
+  body.forEach(function(r){
+    if(!r||!r.length)return;
+    var nat=String(r[idxNat]||'').trim().toUpperCase();
+    if(!nat)return;
+    if(nat==='D'){pendD=r;}
+    else if(nat==='C'){if(pendD){pares.push({d:pendD,c:r});pendD=null;}}
+  });
+  var codHSet={},grupos={},ordem=[],usedSlugs={};
+  pares.forEach(function(p){
+    var deb=String(p.d[idxCodRed]||'').trim(),cred=String(p.c[idxCodRed]||'').trim();
+    if(!deb||!cred)return;
+    var tipoRaw=String(p.d[idxTipo]||p.c[idxTipo]||'').trim()||'TIPO';
+    var codH=String(p.d[idxCodH]||p.c[idxCodH]||'').trim();if(codH)codHSet[codH]=true;
+    var histRaw=String(p.d[idxHist]||'').trim()||String(p.c[idxHist]||'').trim();
+    var fil=idxFil!==undefined?String(p.d[idxFil]||p.c[idxFil]||'').trim():'';
+    var histNorm=normalizarParaComparacao(histRaw);
+    var chavePadrao=detectarChavePadrao(histNorm);
+    /* chave de deduplicação usa o texto normalizado INTEIRO (nunca truncado), pra não colapsar
+       por engano dois tipos diferentes que só se distinguem depois da 6ª/7ª palavra */
+    var mapKey=chavePadrao||('T:'+tipoRaw+'|H:'+histNorm);
+    if(!grupos[mapKey]){
+      var slug=chavePadrao;
+      if(!slug){
+        var base=slugify(tipoRaw)+'_'+slugify(histNorm);
+        slug=base;var n=2;
+        while(usedSlugs[slug]){slug=base+'_'+n;n++;} /* garante unicidade mesmo se o slug truncado colidir */
+      }
+      usedSlugs[slug]=true;
+      grupos[mapKey]={key:slug,fromPadrao:!!chavePadrao,hist:histRaw,deb:deb,cred:cred,tipoRaw:tipoRaw,filiais:{},variantes:[]};
+      ordem.push(mapKey);
+    }
+    var g=grupos[mapKey];
+    if(fil)g.filiais[fil]=true;
+    if(g.deb!==deb||g.cred!==cred){
+      g.inconsistente=true;
+      g.variantes.push({deb:deb,cred:cred,hist:histRaw});
+    }
+  });
+  var tipos=ordem.map(function(k){
+    var g=grupos[k];
+    return{key:g.key,fromPadrao:g.fromPadrao,hist:g.hist,deb:g.deb,cred:g.cred,inconsistente:!!g.inconsistente,variantes:g.variantes,filiais:Object.keys(g.filiais),label:g.fromPadrao?null:(g.hist.replace(/\s+/g,' ').trim().slice(0,70)||g.tipoRaw)};
+  });
+  var codHValues=Object.keys(codHSet);
+  return{tipos:tipos,codHValues:codHValues,totalLinhas:body.length,totalPares:pares.length};
+}
+function _findTipoCard(key){
+  var el=document.querySelectorAll('#tipos-lista .tipo-card');var out=null;
+  el.forEach(function(c){if(c.getAttribute('data-key')===key)out=c;});
+  return out;
+}
+function _setTipoCardValores(id,vals){
+  if(vals.label!==undefined){var l=document.getElementById('tc-lbl-'+id);if(l)l.value=vals.label;}
+  if(vals.hist!==undefined){var h=document.getElementById('tc-hist-'+id);if(h)h.value=vals.hist;}
+  if(vals.deb!==undefined){var d=document.getElementById('tc-deb-'+id);if(d)d.value=vals.deb;}
+  if(vals.cred!==undefined){var c=document.getElementById('tc-cred-'+id);if(c)c.value=vals.cred;}
+  var a=document.getElementById('tc-ativo-'+id);if(a)a.checked=true;
+  var body=document.getElementById('tc-body-'+id);if(body)body.classList.add('open');
+  updateContas(id);
+}
+function importarParametrizacaoExcel(ev){
+  var input=ev.target,file=input.files&&input.files[0];
+  var st=document.getElementById('ef-import-st');
+  if(!file)return;
+  if(!/\.(xlsx|xls)$/i.test(file.name)){
+    if(st){st.textContent='Selecione um arquivo .xlsx ou .xls.';st.className='status-msg err';}
+    input.value='';return;
+  }
+  if(st){st.textContent='Lendo planilha...';st.className='status-msg';}
+  var reader=new FileReader();
+  reader.onload=function(e){
+    input.value='';
+    var res;
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      res=parseParametrizacaoWorkbook(wb);
+    }catch(err){
+      if(st){st.textContent='Erro ao ler o arquivo: '+err.message;st.className='status-msg err';}
+      return;
+    }
+    if(res.erro){if(st){st.textContent=res.erro;st.className='status-msg err';}return;}
+    if(!res.tipos.length){if(st){st.textContent='Nenhum par débito/crédito válido foi encontrado na aba ESTADUAIS.';st.className='status-msg err';}return;}
+    var novos=0,atualizados=0,inconsistentes=[];
+    res.tipos.forEach(function(t){
+      var card=_findTipoCard(t.key);
+      if(card){
+        var id=card.id.replace('tcard-','');
+        _setTipoCardValores(id,{label:t.fromPadrao?undefined:t.label,hist:t.hist,deb:t.deb,cred:t.cred});
+        atualizados++;
+      } else {
+        var l=document.getElementById('tipos-lista');
+        if(l){var div=document.createElement('div');div.innerHTML=tipoCard(t.key,t.label||t.key,t.hist,t.deb,t.cred,true);l.appendChild(div.firstChild);}
+        novos++;
+      }
+      if(t.inconsistente)inconsistentes.push(t.label||t.key);
+    });
+    var codhMsg='';
+    if(res.codHValues.length===1){
+      var chInp=document.getElementById('wt-codh');
+      if(chInp){chInp.value=res.codHValues[0];codhMsg='COD H: '+res.codHValues[0]+' (preenchido).';}
+      else codhMsg='COD H encontrado na planilha: '+res.codHValues[0]+' (este campo só aparece quando o sistema é Winthor — mude o "Sistema de importação" acima se quiser usá-lo).';
+    } else if(res.codHValues.length>1){
+      codhMsg='Atenção: encontrei mais de um COD H diferente na planilha ('+res.codHValues.join(', ')+') — não preenchi automaticamente, escolha manualmente no campo COD H.';
+    }
+    var resumo='Importação concluída. Linhas lidas: '+res.totalLinhas+' · Pares D/C encontrados: '+res.totalPares+
+      ' · Tipos encontrados: '+res.tipos.length+' · Tipos novos: '+novos+' · Tipos atualizados: '+atualizados+
+      ' · Tipos com inconsistência: '+inconsistentes.length+(inconsistentes.length?' ('+inconsistentes.join('; ')+')':'')+
+      (codhMsg?' · '+codhMsg:'');
+    var painel=document.getElementById('ef-import-resumo');
+    if(painel){
+      painel.innerHTML='<div class="alert '+(inconsistentes.length?'alert-warn':'alert-ok')+'"><i class="ti ti-'+(inconsistentes.length?'alert-triangle':'circle-check')+'"></i><span>'+esc(resumo)+' Revise os tipos abaixo antes de salvar.</span></div>';
+    }
+    if(st){st.textContent='';st.className='status-msg';}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function exportarParametrizacaoExcel(k){
+  var e=db.empresas[k];if(!e)return;
+  var tipos=getTipos(e),fs=getFiliais(e);
+  var filCol=fs.map(function(f){return f.fil;}).join(',');
+  var cnpjCol=(fs[0]&&fs[0].cnpj)||e.cnpj||'';
+  var aoa=[['CNPJ','EMPRESA','SISTEMA','FILIAL','TIPO','NATUREZA','CODIGO RED','COD H','HISTORICO','ATIVO']];
+  var codH=(e.mapeamento||{}).cod_h||'';
+  tipos.forEach(function(t){
+    aoa.push([cnpjCol,e.nome,e.sistema||'',filCol,'C3','D',t.deb||'',codH,t.hist||'',t.ativo?'S':'N']);
+    aoa.push([cnpjCol,e.nome,e.sistema||'',filCol,'C3','C',t.cred||'',codH,t.hist||'',t.ativo?'S':'N']);
+  });
+  var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:20},{wch:24},{wch:10},{wch:14},{wch:6},{wch:9},{wch:12},{wch:8},{wch:70},{wch:7}];
+  XLSX.utils.book_append_sheet(wb,ws,'ESTADUAIS');
+  saveXlsx(wb,'PARAMETRIZACAO_'+(cnpjCol.replace(/\D/g,'')||slugify(e.nome))+'.xlsx');
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+var db={empresas:{}},arquivos=[],arquivosPC=[];
+var app=document.getElementById('app');
+
+/* ── Armazenamento: base compartilhada (db do artifact) ou navegador (arquivo aberto localmente) ── */
+function docId(k){return String(k||'').replace(/[^A-Za-z0-9_\-~:@+]/g,'_').slice(0,150)||('emp_'+Date.now());}
+/* separa o cadastro (dados) do registro (histórico/alterado), que tem coluna própria */
+function linhaParaEmpresa(r){
+  var e=JSON.parse(JSON.stringify(r.dados||{}));
+  e.historico=r.historico||[];
+  e.alterado=r.alterado_nome?{nome:r.alterado_nome,em:r.alterado_em}:null;
+  return e;
+}
+function carregarEmpresas(){
+  return sb.from('empresas').select('*').then(function(res){
+    if(res.error)throw res.error;
+    var novo={};(res.data||[]).forEach(function(r){novo[r.id]=linhaParaEmpresa(r);});
+    db.empresas=novo;onEmpresasChanged();
+  });
+}
+function ouvirEmpresas(){
+  if(_canalEmpresas)return;
+  var t=null;
+  _canalEmpresas=sb.channel('empresas-mudancas')
+    .on('postgres_changes',{event:'*',schema:'public',table:'empresas'},function(){
+      clearTimeout(t);t=setTimeout(function(){carregarEmpresas().catch(function(){});},400);
+    }).subscribe();
+}
+function persistEmpresa(id,obj){
+  var dados=JSON.parse(JSON.stringify(obj));var hist=dados.historico||[];
+  delete dados.historico;delete dados.alterado;
+  return sb.from('empresas').upsert({id:id,dados:dados,historico:hist}).then(function(res){
+    if(res.error)throw res.error;
+    return carregarEmpresas();
+  });
+}
+function removerEmpresa(id){
+  return sb.from('empresas').delete().eq('id',id).then(function(res){
+    if(res.error)throw res.error;
+    return carregarEmpresas();
+  });
+}
+function msgErroBase(err){
+  var c=err&&(err.code||'');var m=err&&err.message||'';
+  if(c==='42501'||/row-level security|permission/i.test(m))return'Seu usuário não tem permissão para alterar empresas.';
+  if(/JWT|session/i.test(m))return'Sua sessão expirou. Saia e entre de novo.';
+  return'Não foi possível salvar agora ('+m+'). Tente de novo em instantes.';
+}
+function onEmpresasChanged(){
+  refreshEmpList();
+  var n=Object.keys(db.empresas).length;
+  document.querySelectorAll('.sem-emp').forEach(function(el){
+    el.innerHTML=n?'':'<div class="alert alert-warn"><i class="ti ti-alert-triangle"></i><span>Nenhuma empresa cadastrada.'+(ME.canEdit?' Acesse a aba <strong>Empresas</strong> para cadastrar (a filial é identificada automaticamente pelo CNPJ).':' Peça a quem edita as contas para cadastrar.')+'</span></div>';
+  });
+  if(document.getElementById('prev-card'))renderPreviewAll();
+  if(document.getElementById('prev-card-pc'))renderPreviewPC();
+  if(document.getElementById('prev-card-dp'))renderPreviewDP();
+  refreshCardsSemArquivo();
+}
+
+/* ── Download de arquivos: no Claude passa pela confirmação do visualizador; localmente, download direto.
+   Um arquivo por vez (o Claude só abre uma confirmação de cada vez). ── */
+var _filaSave=Promise.resolve();
+function saveFile(name,data){
+  _filaSave=_filaSave.then(function(){
+    if(downloadsCap){
+      return downloadsCap.save({filename:name,data:data}).catch(function(err){
+        if(err&&err.code!=='declined')avisoGlobal('Não foi possível baixar '+name+': '+(err.message||err.code));
+      });
+    }
+    var blob=data instanceof Blob?data:new Blob([data]),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},2000);
+  });
+  return _filaSave;
+}
+function saveXlsx(wb,name){return saveFile(name,new Uint8Array(XLSX.write(wb,{type:'array',bookType:'xlsx'})));}
+function dl(content,name){return saveFile(name,content);}
+function avisoGlobal(m){
+  openModal('<h3>Atenção</h3><p style="font-size:13px;margin-top:8px">'+esc(m)+'</p><div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">OK</button></div>');
+}
+
+function brandSvg(){
+  return '<svg viewBox="0 0 24 24" fill="none" width="26" height="26">'+
+  '<g stroke="#0AE18C" stroke-width="1.6" stroke-linecap="round">'+
+  '<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>'+
+  '<line x1="4.5" y1="4.5" x2="7" y2="7"/><line x1="17" y1="17" x2="19.5" y2="19.5"/>'+
+  '<line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>'+
+  '<line x1="4.5" y1="19.5" x2="7" y2="17"/><line x1="17" y1="7" x2="19.5" y2="4.5"/></g>'+
+  '<g stroke="#14C8FA" stroke-width="1.6" stroke-linecap="round">'+
+  '<line x1="9" y1="3" x2="10" y2="6.5"/><line x1="14" y1="17.5" x2="15" y2="21"/>'+
+  '<line x1="3" y1="9" x2="6.5" y2="10"/><line x1="17.5" y1="14" x2="21" y2="15"/></g></svg>';
+}
+function acessoBadge(){if(ME.perfil){var i=PERFIS[ME.perfil]||{label:ME.perfil};return '<span class="badge '+(i.isAdmin?'badge-admin':i.canEdit?'badge-edit':'badge-view')+'">'+esc(i.label)+'</span>';}return ME.canEdit?'<span class="badge badge-edit">Edita contas</span>':'<span class="badge badge-view">Somente uso</span>';}
+function sisPill(s){return s==='winthor'?'<span class="sis-pill sis-w"><i class="ti ti-table"></i> Winthor</span>':'<span class="sis-pill sis-d"><i class="ti ti-file-text"></i> Domínio</span>';}
+function topbar(){
+  var nome=ME.nome||'';
+  var ini=nome.split(' ').slice(0,2).map(function(n){return n[0]||'';}).join('').toUpperCase()||'·';
+  return '<div class="topbar">'+
+    '<div class="brand" style="margin-bottom:0">'+brandSvg()+'<span class="brand-name">Planning</span></div>'+
+    '<div class="topbar-right">'+acessoBadge()+
+      (nome?'<div class="avatar" title="'+esc(nome)+'">'+esc(ini)+'</div>':'')+
+      '<button class="btn btn-secondary btn-sm" onclick="telaTrocarSenha(false)" title="Trocar minha senha"><i class="ti ti-key"></i></button>'+
+      '<button class="btn btn-secondary btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i> Sair</button>'+
+    '</div></div>';
+}
+function openModal(html){document.getElementById('modal-inner').innerHTML=html;document.getElementById('modal-bg').classList.add('open');}
+function closeModal(){document.getElementById('modal-bg').classList.remove('open');document.getElementById('modal-inner').innerHTML='';}
+document.getElementById('modal-bg').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+/* ── RENDER ROOT ── */
+function render(){renderMain();}
+function renderMain(){
+  var p={canEdit:ME.canEdit};
+  app.innerHTML=topbar()+
+    '<div class="tabs">'+
+      '<button class="tab active" onclick="sTab(\'apuracao\',this)"><i class="ti ti-chart-bar"></i> Apuração</button>'+
+      '<button class="tab" onclick="sTab(\'piscofins\',this)"><i class="ti ti-file-spreadsheet"></i> PIS/COFINS</button>'+
+      '<button class="tab" onclick="sTab(\'depreciacao\',this)"><i class="ti ti-building-warehouse"></i> Depreciação</button>'+
+      (p.canEdit?'<button class="tab" onclick="sTab(\'empresas\',this)"><i class="ti ti-building"></i> Empresas</button>':'')+
+      (ME.isAdmin?'<button class="tab" onclick="sTab(\'usuarios\',this)"><i class="ti ti-users"></i> Usuários</button>':'')+
+    '</div>'+
+    '<div class="pane active" id="pane-apuracao">'+paneApuracao()+'</div>'+
+    '<div class="pane" id="pane-piscofins">'+panePisCofins()+'</div>'+
+    '<div class="pane" id="pane-depreciacao">'+paneDepreciacao()+'</div>'+
+    (p.canEdit?'<div class="pane" id="pane-empresas">'+paneEmpresas()+'</div>':'')+
+    (ME.isAdmin?'<div class="pane" id="pane-usuarios">'+paneUsuarios()+'</div>':'');
+  setupDrop();setupDropPC();setupDropDP();onEmpresasChanged();
+  if(ME.isAdmin)carregarUsuarios();
+}
+function boot(){
+  ME.modo='base';
+  app.innerHTML='<div class="brand">'+brandSvg()+'<span class="brand-name">Planning</span></div><div class="card" style="font-size:13px;color:#5F5E5A">Carregando…</div>';
+  sb.auth.getSession().then(function(r){
+    var sess=r.data&&r.data.session;
+    if(sess)entrarComSessao(sess.user);else renderLogin();
+  }).catch(function(){renderLogin();});
+}
+function entrarComSessao(user){
+  return sb.from('usuarios').select('*').eq('id',user.id).maybeSingle().then(function(r){
+    var u=r.data;
+    if(r.error||!u){
+      sb.auth.signOut();
+      telaSimples('Apurações','Este e-mail não está liberado.',
+        '<div style="font-size:13px;color:#5F5E5A">O login existe, mas não há cadastro no Apurações para ele. Peça à administração para liberar o seu acesso.</div>'+
+        '<button class="btn btn-secondary btn-full" style="margin-top:12px" onclick="renderLogin()">Voltar</button>');
+      return;
+    }
+    ME.login=u.email;ME.nome=u.nome;ME.perfil=u.perfil;ME.id=u.id;
+    ME.isAdmin=!!u.admin;ME.canEdit=!!(u.admin||u.pode_editar);
+    if(u.trocar_senha){telaTrocarSenha(true);return;}
+    render();
+    carregarEmpresas().catch(function(err){avisoGlobal('Não consegui carregar as empresas: '+msgErroBase(err));});
+    ouvirEmpresas();
+  });
+}
+function doLogout(){
+  if(_canalEmpresas){sb.removeChannel(_canalEmpresas);_canalEmpresas=null;}
+  sb.auth.signOut().finally(function(){
+    ME.login='';ME.nome='';ME.perfil='';ME.isAdmin=false;ME.canEdit=false;
+    db.empresas={};arquivos=[];arquivosPC=[];arquivosDP=[];
+    renderLogin();
+  });
+}
+function telaSimples(titulo,sub,corpo){
+  app.innerHTML='<div class="brand">'+brandSvg()+'<span class="brand-name">Planning</span></div>'+
+    '<h2>'+titulo+'</h2><p class="sub">'+sub+'</p><div class="card" style="max-width:400px">'+corpo+'</div>';
+}
+function renderLogin(){
+  telaSimples('Apurações','Entre com o seu e-mail da Planning e a senha.',
+    '<form onsubmit="event.preventDefault();doLogin()">'+
+      '<div class="field"><label for="l-u">E-mail</label><input id="l-u" type="email" autocomplete="username" placeholder="nome.sobrenome@planning.com.br"></div>'+
+      '<div class="field"><label for="l-p">Senha</label><input type="password" id="l-p" autocomplete="current-password" placeholder="senha"></div>'+
+      '<button class="btn btn-primary btn-full" type="submit"><i class="ti ti-login"></i> Entrar</button>'+
+      '<div class="status-msg" id="l-st"></div></form>');
+}
+function doLogin(){
+  var email=(document.getElementById('l-u').value||'').trim().toLowerCase(),pass=document.getElementById('l-p').value||'';
+  var st=document.getElementById('l-st');
+  if(!email||!pass){st.textContent='Preencha e-mail e senha.';st.className='status-msg err';return;}
+  st.textContent='Entrando…';st.className='status-msg';
+  sb.auth.signInWithPassword({email:email,password:pass}).then(function(r){
+    if(r.error){st.textContent=/invalid/i.test(r.error.message)?'E-mail ou senha incorretos.':r.error.message;st.className='status-msg err';return;}
+    entrarComSessao(r.data.user);
+  });
+}
+function telaTrocarSenha(obrigatorio){
+  var corpo='<form onsubmit="event.preventDefault();salvarNovaSenha('+(obrigatorio?'true':'false')+')">'+
+      '<div class="field"><label for="ns-1">Nova senha</label><input type="password" id="ns-1" autocomplete="new-password" placeholder="mínimo 6 caracteres"></div>'+
+      '<div class="field"><label for="ns-2">Repita a nova senha</label><input type="password" id="ns-2" autocomplete="new-password"></div>'+
+      '<button class="btn btn-primary btn-full" type="submit">Salvar senha</button>'+
+      (obrigatorio?'':'<button class="btn btn-secondary btn-full" type="button" style="margin-top:8px" onclick="render();onEmpresasChanged()">Cancelar</button>')+
+      '<div class="status-msg" id="ns-st"></div></form>';
+  telaSimples(obrigatorio?'Crie a sua senha':'Trocar senha',
+    obrigatorio?'Olá, '+esc(ME.nome)+'! Este é o seu primeiro acesso. Defina uma senha só sua para continuar.':'Defina a nova senha de acesso ao Apurações.',corpo);
+}
+function salvarNovaSenha(obrigatorio){
+  var a=document.getElementById('ns-1').value||'',b=document.getElementById('ns-2').value||'';
+  var st=document.getElementById('ns-st');
+  if(a.length<6){st.textContent='A senha precisa de pelo menos 6 caracteres.';st.className='status-msg err';return;}
+  if(a!==b){st.textContent='As duas senhas não são iguais.';st.className='status-msg err';return;}
+  st.textContent='Salvando…';st.className='status-msg';
+  sb.auth.updateUser({password:a}).then(function(r){
+    if(r.error){st.textContent=/different|same/i.test(r.error.message)?'Escolha uma senha diferente da atual.':r.error.message;st.className='status-msg err';return;}
+    return sb.rpc('senha_trocada').then(function(){
+      return sb.auth.getUser().then(function(u){return entrarComSessao(u.data.user);});
+    });
+  });
+}
+
+/* ══════════════════ USUÁRIOS ══════════════════ */
+var usuarios={};
+function podeEditarUsuario(u){return !!(u&&(u.admin||u.pode_editar));}
+function carregarUsuarios(){
+  return sb.from('usuarios').select('*').order('nome').then(function(r){
+    if(r.error)return;
+    usuarios={};(r.data||[]).forEach(function(u){usuarios[u.id]=u;});
+    refreshUserList();
+  });
+}
+function chamarAdmin(body){
+  return sb.functions.invoke('admin-usuarios',{body:body}).then(function(r){
+    if(r.error){
+      var ctx=r.error.context;
+      if(ctx&&typeof ctx.json==='function')return ctx.json().then(function(j){throw new Error((j&&j.erro)||r.error.message);});
+      throw new Error(r.error.message);
+    }
+    if(r.data&&r.data.erro)throw new Error(r.data.erro);
+    return r.data;
+  });
+}
+function paneUsuarios(){
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'+
+    '<div class="step-label" style="margin-bottom:0">Usuários</div>'+
+    '<button class="btn btn-primary btn-sm" onclick="showUserForm(null)"><i class="ti ti-user-plus"></i> Novo usuário</button></div>'+
+    '<div id="user-list">'+listaUsuariosHtml()+'</div><div id="user-form"></div>';
+}
+function listaUsuariosHtml(){
+  var ks=Object.keys(usuarios);
+  if(!ks.length)return'<div style="font-size:12px;color:#888">Carregando…</div>';
+  return ks.map(function(k){
+    var u=usuarios[k],p=PERFIS[u.perfil]||{label:u.perfil};
+    return '<div class="user-item"><div><div style="font-size:13px;font-weight:500">'+esc(u.nome)+'</div>'+
+      '<div style="font-size:11px;color:#888;margin-top:1px">'+esc(u.email)+' &nbsp;·&nbsp; '+(podeEditarUsuario(u)?'<span style="color:#00BF63"><i class="ti ti-pencil" style="font-size:10px"></i> edita contas</span>':'somente uso')+
+        (u.trocar_senha?' &nbsp;·&nbsp; <span style="color:#854F0B">ainda não definiu a senha</span>':'')+'</div></div>'+
+      '<div style="display:flex;align-items:center;gap:6px"><span class="badge '+(u.admin?'badge-admin':podeEditarUsuario(u)?'badge-edit':'badge-view')+'">'+esc(p.label)+'</span>'+
+      '<button class="btn btn-secondary btn-sm" onclick="showUserForm(\''+esc(k)+'\')"><i class="ti ti-edit"></i></button>'+
+      (k!==ME.id?'<button class="btn btn-danger btn-sm" onclick="excUser(\''+esc(k)+'\')"><i class="ti ti-trash"></i></button>':'')+
+      '</div></div>';
+  }).join('');
+}
+function refreshUserList(){var el=document.getElementById('user-list');if(el)el.innerHTML=listaUsuariosHtml();}
+function showUserForm(k){
+  var fa=document.getElementById('user-form');if(!fa)return;
+  var u=k&&usuarios[k]?usuarios[k]:{nome:'',email:'',perfil:'analista',pode_editar:true};
+  var ehEu=k===ME.id;
+  var opts=Object.keys(PERFIS).map(function(p){var i=PERFIS[p];return'<option value="'+p+'" '+(u.perfil===p?'selected':'')+'>'+i.label+(i.isAdmin?' — gerencia usuários':'')+'</option>';}).join('');
+  fa.innerHTML='<div class="sep"></div><div class="step-label">'+(k?'Editar usuário':'Novo usuário')+'</div><div class="divider"></div>'+
+    '<div class="card"><div class="grid2">'+
+      '<div class="field"><label for="nu-nome">Nome completo</label><input id="nu-nome" value="'+esc(u.nome||'')+'" placeholder="Nome Sobrenome"></div>'+
+      '<div class="field"><label for="nu-email">E-mail da Planning</label><input id="nu-email" type="email" value="'+esc(u.email||'')+'" '+(k?'disabled style="background:#F2F2F2;color:#888"':'placeholder="nome.sobrenome@planning.com.br"')+'></div>'+
+    '</div><div class="grid2">'+
+      '<div class="field"><label for="nu-pass">'+(k?'Nova senha provisória (em branco = não altera)':'Senha provisória')+'</label><input type="password" id="nu-pass" autocomplete="new-password" placeholder="mínimo 6 caracteres"></div>'+
+      '<div class="field"><label for="nu-perf">Perfil</label><select id="nu-perf" '+(ehEu?'disabled':'')+' onchange="var c=document.getElementById(\'nu-edit\');if(c)c.checked=!!(PERFIS[this.value]||{}).canEdit">'+opts+'</select>'+
+        '<label class="chk-label" style="margin-top:6px"><input type="checkbox" id="nu-edit" '+(podeEditarUsuario(u)?'checked':'')+' '+(ehEu?'disabled':'')+'> Pode editar empresas e contas</label></div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:#888">Com senha provisória, a pessoa cria a própria senha no próximo acesso.</div>'+
+    '<div style="display:flex;gap:8px;margin-top:.75rem">'+
+      '<button class="btn btn-primary" onclick="salvarUser(\''+esc(k||'')+'\')"><i class="ti ti-check"></i> '+(k?'Salvar alterações':'Criar usuário')+'</button>'+
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'user-form\').innerHTML=\'\'"><i class="ti ti-x"></i> Cancelar</button>'+
+    '</div><div class="status-msg" id="nu-st"></div></div>';
+  fa.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function salvarUser(k){
+  var nome=(document.getElementById('nu-nome').value||'').trim(),pass=document.getElementById('nu-pass').value||'';
+  var perf=(document.getElementById('nu-perf')||{}).value||'analista';
+  var podeEd=!!(document.getElementById('nu-edit')||{}).checked;
+  var st=document.getElementById('nu-st');
+  if(!nome){st.textContent='Informe o nome.';st.className='status-msg err';return;}
+  if(!k&&!pass){st.textContent='Defina a senha provisória.';st.className='status-msg err';return;}
+  if(pass&&pass.length<6){st.textContent='A senha precisa de pelo menos 6 caracteres.';st.className='status-msg err';return;}
+  var body=k?{acao:'alterar',id:k,nome:nome,senha:pass||undefined}
+            :{acao:'criar',email:(document.getElementById('nu-email').value||'').trim(),nome:nome,perfil:perf,pode_editar:podeEd,senha:pass};
+  if(k&&k!==ME.id){body.perfil=perf;body.pode_editar=podeEd;}
+  st.textContent='Salvando…';st.className='status-msg';
+  chamarAdmin(body).then(function(){
+    st.textContent=k?'Usuário atualizado.':'Usuário criado.';st.className='status-msg ok';
+    carregarUsuarios();
+    setTimeout(function(){var f=document.getElementById('user-form');if(f)f.innerHTML='';},700);
+  }).catch(function(err){st.textContent=err.message;st.className='status-msg err';});
+}
+function excUser(k){
+  var u=usuarios[k];if(!u)return;
+  openModal('<h3>Excluir usuário</h3><p style="font-size:13px;margin-top:8px">Excluir <strong>'+esc(u.nome)+'</strong> ('+esc(u.email)+')? Ele perde o acesso na hora.</p>'+
+    '<div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-danger" onclick="confirmarExcUser(\''+esc(k)+'\')">Excluir</button></div>');
+}
+function confirmarExcUser(k){closeModal();chamarAdmin({acao:'excluir',id:k}).then(carregarUsuarios).catch(function(err){avisoGlobal(err.message);});}
+
+/* ── Backup (para levar os cadastros do arquivo local para a base compartilhada) ── */
+function exportarBackup(){
+  var json=JSON.stringify({versao:1,empresas:db.empresas},null,2);
+  saveFile('PLANNING_BACKUP_EMPRESAS.json',json);
+}
+function importarBackup(ev){
+  var input=ev.target,file=input.files&&input.files[0];if(!file)return;
+  var st=document.getElementById('bk-st');
+  var reader=new FileReader();
+  reader.onload=function(e){
+    input.value='';
+    var o;try{o=JSON.parse(e.target.result);}catch(err){st.textContent='Arquivo inválido: não é um backup do Planning.';st.className='status-msg err';return;}
+    var emps=(o&&o.empresas)||{};var ks=Object.keys(emps);
+    if(!ks.length){st.textContent='Nenhuma empresa encontrada no backup.';st.className='status-msg err';return;}
+    st.textContent='Importando '+ks.length+' empresa(s)…';st.className='status-msg';
+    var feitos=0,p=Promise.resolve();
+    ks.forEach(function(k){p=p.then(function(){var id2=docId(k),novo=JSON.parse(JSON.stringify(emps[k]));return persistEmpresa(id2,comRegistro(db.empresas[id2]||(novo.historico?novo:null),novo,'importou')).then(function(){feitos++;});});});
+    p.then(function(){st.textContent=feitos+' empresa(s) importada(s). Empresas com o mesmo código foram substituídas.';st.className='status-msg ok';})
+     .catch(function(err){st.textContent=feitos+' importada(s) antes do erro. '+msgErroBase(err);st.className='status-msg err';});
+  };
+  reader.readAsText(file);
+}
+
+function sTab(id,el){
+  document.querySelectorAll('.tabs .tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.pane').forEach(function(p){p.classList.remove('active');});
+  el.classList.add('active');document.getElementById('pane-'+id).classList.add('active');
+  if(id==='apuracao'){setupDrop();renderPreviewAll();}
+  if(id==='piscofins'){setupDropPC();renderPreviewPC();}
+  if(id==='depreciacao'){setupDropDP();renderPreviewDP();}
+}
+
+/* ══════════════════ APURAÇÃO ══════════════════ */
+function paneApuracao(){
+  var keys=Object.keys(db.empresas);
+  return '<div class="step-label">1 — PDFs dos Livros Fiscais ICMS</div><div class="divider"></div>'+
+  '<div class="card">'+
+    '<div class="drop" id="drop" onclick="document.getElementById(\'pdf-in\').click()">'+
+      '<i class="ti ti-file-type-pdf" style="font-size:32px;color:#0AE18C;display:block;margin-bottom:6px"></i>'+
+      '<div class="drop-label">Clique ou arraste um ou mais <strong>PDFs do Livro Fiscal ICMS</strong> (uma filial por PDF)</div>'+
+      '<div class="drop-name" id="drop-name"></div>'+
+    '</div>'+
+    '<input type="file" id="pdf-in" accept=".pdf" multiple style="display:none">'+
+  '</div>'+
+  '<div class="sem-emp"></div>'+
+  '<div id="novos-alert"></div>'+
+  '<div id="apur-alerts"></div>'+
+  cardSemArquivo('ap')+
+  cabecalhoPrevia('ap','2 — Filiais identificadas e prévia')+
+  '<div class="preview-wrap" id="prev-card">'+
+    '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar as filiais automaticamente pelo CNPJ.</div>'+
+  '</div>'+
+  seletorFormato('ap')+
+  '<button class="btn btn-primary btn-full" id="btn-gerar" disabled onclick="gerarArquivo()" style="margin-top:.25rem">'+
+    '<i class="ti ti-download"></i> Gerar arquivo(s) de importação</button>'+
+  '<div class="status-msg" id="apur-st"></div>';
+}
+
+function setupDrop(){
+  var drop=document.getElementById('drop'),inp=document.getElementById('pdf-in');
+  if(!drop||!inp||drop.getAttribute('data-ok'))return; /* liga os eventos uma vez só (sTab chama de novo a cada troca de aba) */
+  drop.setAttribute('data-ok','1');
+  ['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('over');});});
+  drop.addEventListener('dragleave',function(e){e.preventDefault();drop.classList.remove('over');});
+  drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('over');var fs=e.dataTransfer&&e.dataTransfer.files;if(fs&&fs.length)loadPdfs(fs);});
+  inp.addEventListener('change',function(){if(inp.files&&inp.files.length)loadPdfs(inp.files);inp.value='';});
+}
+
+/* Reconstrói as linhas do PDF respeitando a posição (x,y) de cada item, em vez de apenas
+   concatená-los na ordem em que aparecem no content-stream do PDF (ordem que NÃO corresponde
+   à ordem visual de leitura neste layout, causando leitura de valores errados/trocados). */
+function linesFromContent(content){
+  var items=content.items.map(function(it){return{str:it.str,x:it.transform[4],y:it.transform[5]};})
+    .filter(function(it){return it.str&&it.str.trim();});
+  items.sort(function(a,b){return(b.y-a.y)||(a.x-b.x);});
+  var lines=[],cur=null,TOL=2.5;
+  items.forEach(function(it){
+    if(cur&&Math.abs(cur.y-it.y)<=TOL){cur.items.push(it);}
+    else{cur={y:it.y,items:[it]};lines.push(cur);}
+  });
+  return lines.map(function(l){
+    l.items.sort(function(a,b){return a.x-b.x;});
+    var s=l.items.map(function(it){return it.str;}).join(' ').replace(/\s+/g,' ').trim();
+    while(/^[A-ZÀ-Ü]\s+/.test(s)&&s.replace(/^[A-ZÀ-Ü]\s+/,'').length>2){s=s.replace(/^[A-ZÀ-Ü]\s+/,'');}
+    return s;
+  });
+}
+
+function readOnePdf(file){
+  return new Promise(function(resolve){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      pdfjsLib.getDocument({data:new Uint8Array(ev.target.result)}).promise.then(function(pdf){
+        var arr=[];for(var i=1;i<=pdf.numPages;i++)arr.push(pdf.getPage(i));
+        Promise.all(arr).then(function(pl){return Promise.all(pl.map(function(p){return p.getTextContent();}));})
+        .then(function(cs){
+          var lines=[];cs.forEach(function(c){lines=lines.concat(linesFromContent(c));});
+          var parsed=parsePdfLines(lines);
+          var match=matchEmpresaByCnpj(parsed.cnpj);
+          resolve({nome:file.name,mesano:parsed.mesano,cnpj:parsed.cnpj,lancamentos:parsed.lancamentos,itens:parsed.itens,resumo:parsed.resumo,empresaKey:match?match.key:null,filial:match?match.fil:null});
+        });
+      }).catch(function(err){resolve({nome:file.name,erro:err.message});});
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function loadPdfs(fileList){
+  var files=Array.prototype.slice.call(fileList).filter(function(f){return /\.pdf$/i.test(f.name);});
+  if(!files.length)return;
+  var dn=document.getElementById('drop-name');dn.style.display='block';dn.textContent='Lendo '+files.length+' PDF(s)...';
+  Promise.all(files.map(readOnePdf)).then(function(results){
+    results.forEach(function(r){r.id='a'+Date.now()+Math.random().toString(36).slice(2,7);arquivos.push(r);});
+    document.getElementById('drop').classList.add('done');
+    dn.textContent=arquivos.length+' PDF(s) carregado(s)';
+    renderPreviewAll();
+  });
+}
+
+function parseValorBR(s){
+  if(s===undefined||s===null)return NaN;
+  s=String(s).trim();if(!s)return NaN;
+  s=s.replace(/\./g,'').replace(',','.');
+  return parseFloat(s);
+}
+function extrairCnpj(text){
+  var m=text.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+  return m?m[1]:'';
+}
+function normCnpj(s){return String(s||'').replace(/\D/g,'');}
+/* Uma empresa pode ser um "grupo" com várias filiais (mesmo mapeamento de contas, CNPJs e
+   códigos FIL diferentes). Retorna sempre a lista de filiais, migrando registros antigos
+   (cnpj/filial únicos) para o novo formato em memória, sem precisar reescrever o localStorage. */
+function getFiliais(e){
+  if(e.filiais&&e.filiais.length)return e.filiais;
+  if(e.cnpj)return[{cnpj:e.cnpj,fil:e.filial||'1'}];
+  return[];
+}
+function matchEmpresaByCnpj(cnpj){
+  var alvo=normCnpj(cnpj);if(!alvo)return null;
+  var achado=null;
+  Object.keys(db.empresas).forEach(function(k){
+    if(achado)return;
+    getFiliais(db.empresas[k]).forEach(function(f){
+      if(achado)return;
+      if(normCnpj(f.cnpj)===alvo)achado={key:k,fil:f.fil};
+    });
+  });
+  return achado;
+}
+/* Padrão estrito de valor monetário BR: milhares com ponto, 2 casas decimais com vírgula. */
+var CURR_RE_SRC='(\\d{1,3}(?:\\.\\d{3})*,\\d{2})';
+function lastCurrencyInLine(line){
+  var re=new RegExp(CURR_RE_SRC,'g'),mm,last=null;
+  while((mm=re.exec(line))!==null)last=mm[1];
+  return last?parseValorBR(last):NaN;
+}
+function valorNaLinha(lines,labelRe){
+  for(var i=0;i<lines.length;i++){
+    if(labelRe.test(lines[i])){
+      var v=lastCurrencyInLine(lines[i]);
+      if(!isNaN(v))return v;
+    }
+  }
+  return NaN;
+}
+/* Agrupa as linhas de uma seção (002/003/006) em blocos por item numerado ("1 - ...", "2 - ...").
+   Cada nota pode quebrar em várias linhas visuais e o valor pode cair no meio do bloco (não
+   necessariamente na última linha), por isso concatenamos o bloco inteiro antes de buscar o valor. */
+function parseItemBlocks(lines,startIdx,endMarkerRe){
+  var blocks=[],i=startIdx,cur=null;
+  var itemStartRe=/^(\d+)\s*-\s*/;
+  for(;i<lines.length;i++){
+    var line=lines[i];
+    if(endMarkerRe.test(line))break;
+    var mm=line.match(itemStartRe);
+    if(mm){if(cur)blocks.push(cur);cur={num:mm[1],text:line};}
+    else if(cur){cur.text+=' '+line;}
+  }
+  if(cur)blocks.push(cur);
+  return blocks;
+}
+/* Extrai lançamentos a partir das linhas do PDF já reconstruídas por posição (x,y).
+   Não usa nem altera variáveis globais. */
+function parsePdfLines(lines){
+  var lanc=[];
+  var joined=lines.join(' ');
+  var mesano='';var m=joined.match(/M[eê]s[^\d]*(\d{2}\/\d{4})/);if(m)mesano=m[1];
+  var mm=mesano?parseInt(mesano.split('/')[0]):1,yy=mesano?parseInt(mesano.split('/')[1]):2025;
+  var ld=new Date(yy,mm,0).getDate();
+  var dd=String(ld).padStart(2,'0'),ms=String(mm).padStart(2,'0');
+  var dDisp=dd+'/'+ms+'/'+yy,dFmt=String(yy)+ms+dd;
+
+  var idx002=lines.findIndex(function(l){return/002\s*-\s*Outros\s*D[eé]bitos/i.test(l);});
+  if(idx002>=0){
+    parseItemBlocks(lines,idx002+1,/^Total\s+Outros\s+D[eé]bitos/i).forEach(function(b){
+      if(/diferen[cç]a\s+de\s+al[ií]quotas/i.test(b.text)){
+        var notaM=b.text.match(/Nota\s*N[oº]:\s*(\d+)/i);
+        var val=lastCurrencyInLine(b.text);
+        if(!isNaN(val)&&val>0)lanc.push({tipo:'difal',valor:val,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{nota:notaM?notaM[1]:''}});
+      }
+    });
+  }
+  var idx003=lines.findIndex(function(l){return/003\s*-\s*Estorno\s*de\s*Cr[eé]ditos/i.test(l);});
+  if(idx003>=0){
+    parseItemBlocks(lines,idx003+1,/^Total\s+Estornos\s+Cr[eé]ditos/i).forEach(function(b){
+      var val=lastCurrencyInLine(b.text);
+      if(isNaN(val)||val<=0)return;
+      if(/CTE\s*-\s*Art\.\s*62/i.test(b.text)&&/benef/i.test(b.text)){
+        lanc.push({tipo:'benef_fiscal',valor:val,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{}});
+      } else if(/oper\.\s*interestadual/i.test(b.text)){
+        lanc.push({tipo:'estorno_interestadual',valor:val,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{}});
+      } else if(/oper\.\s*interna/i.test(b.text)){
+        lanc.push({tipo:'estorno_interna',valor:val,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{}});
+      }
+    });
+  }
+  var idx006=lines.findIndex(function(l){return/006\s*-\s*Outros\s*Cr[eé]ditos/i.test(l);});
+  if(idx006>=0){
+    parseItemBlocks(lines,idx006+1,/^Total\s+Outros\s+Cr[eé]ditos/i).forEach(function(b){
+      var val=lastCurrencyInLine(b.text);
+      if(isNaN(val)||val<=0)return;
+      if(/Cr\.\s*out\./i.test(b.text)){
+        lanc.push({tipo:'cr_out_atacadista',valor:val,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{}});
+      }
+    });
+  }
+  var v013=valorNaLinha(lines,/013\s*-\s*Imposto\s*a\s*Recolher/i);
+  if(isNaN(v013))v013=valorNaLinha(lines,/011\s*-\s*Saldo\s*Devedor/i);
+  /* Créditos na apuração: com imposto a recolher (013 > 0) lança o 010 (total dos créditos);
+     com saldo credor (014) ou saldo zerado lança o 004 (subtotal dos débitos). */
+  var v004=valorNaLinha(lines,/004\s*-\s*SUB\s*-?\s*TOTAL/i),v010=valorNaLinha(lines,/010\s*-\s*TOTAL/i);
+  var vCred=(!isNaN(v013)&&v013>0)?v010:v004;
+  if(!isNaN(vCred)&&vCred>0)lanc.push({tipo:'outros_creditos',valor:vCred,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{mesano:mesano},origem:(!isNaN(v013)&&v013>0)?'010':'004'});
+  if(!isNaN(v013)&&v013>0)lanc.push({tipo:'apuracao',valor:v013,dDisp:dDisp,dFmt:dFmt,mesano:mesano,ex:{mesano:mesano}});
+
+  /* Demais itens discriminados (002/003/006/007/012) que a leitura fixa acima não usou:
+     ficam guardados para casar com as regras cadastradas da empresa (ver itensAutoDoLivro). */
+  var itens=itensDiscriminados(lines).filter(function(it){return !blocoJaLido(it.secao,it.texto);});
+  var v014=valorNaLinha(lines,/014\s*-\s*Saldo\s*Credor/i);
+  return {mesano:mesano,cnpj:extrairCnpj(joined),lancamentos:lanc,itens:itens,
+    resumo:{v004:isNaN(v004)?null:v004,v010:isNaN(v010)?null:v010,v013:isNaN(v013)?null:v013,v014:isNaN(v014)?null:v014}};
+}
+/* Lê os itens de cada seção discriminada do livro, parando no campo seguinte (0xx - ...).
+   Funciona com o livro da Domínio e com o do SAAM (onde o 002 vazio não tem linha de total). */
+function itensDiscriminados(lines){
+  var out=[],secRe=/^(0\d\d)\s*-\s*/,itemRe=/^(\d{1,3})\s*-\s*/;
+  var alvo={'002':1,'003':1,'006':1,'007':1,'012':1},sec=null,cur=null;
+  function fecha(){if(cur){var v=lastCurrencyInLine(cur.text);if(!isNaN(v)&&v>0)out.push({secao:cur.secao,texto:cur.text.replace(itemRe,'').replace(/\s*\d{1,3}(?:\.\d{3})*,\d{2}\s*$/,'').replace(/\s+/g,' ').trim(),valor:v});cur=null;}}
+  lines.forEach(function(l){
+    var t=String(l).trim(),ms=t.match(secRe);
+    if(ms&&!/^0\d\d\s*-\s*\d/.test(t)){fecha();sec=alvo[ms[1]]?ms[1]:null;return;}
+    if(!sec)return;
+    if(/^Total\b/i.test(t)){fecha();return;}
+    var mi=t.match(itemRe);
+    if(mi){fecha();cur={secao:sec,text:t};}
+    else if(cur)cur.text+=' '+t;
+  });
+  fecha();
+  return out;
+}
+/* Mesmos critérios da leitura fixa, para não lançar o mesmo item duas vezes */
+function blocoJaLido(secao,texto){
+  if(secao==='002')return /diferen[cç]a\s+de\s+al[ií]quotas/i.test(texto);
+  if(secao==='003')return (/CTE\s*-\s*Art\.\s*62/i.test(texto)&&/benef/i.test(texto))||/oper\.\s*interestadual/i.test(texto)||/oper\.\s*interna/i.test(texto);
+  if(secao==='006')return /Cr\.\s*out\./i.test(texto);
+  return false;
+}
+function normHist(s){
+  return String(s||'').replace(/\{[^}]*\}/g,' ').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+}
+/* Casa cada item do livro com a regra da empresa cujo histórico aparece no texto do item.
+   Devolve {lancs:[...], semRegra:[...]} */
+function itensAutoDoLivro(a,e){
+  var res={lancs:[],semRegra:[]};if(!a.itens||!a.itens.length||!e)return res;
+  var regras=getTipos(e).filter(function(t){
+    return t.ativo&&t.deb&&t.cred&&PKEYS.indexOf(t.key)===-1&&t.key.indexOf('pcextra_')!==0&&t.key.charAt(0)!=='_'&&typeof t.hist==='string';
+  }).map(function(t){var n=normHist(t.hist);return{t:t,n:n.slice(0,60)};}).filter(function(r){return r.n.length>=15;});
+  var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
+  var dd=String(new Date(yy,mm,0).getDate()).padStart(2,'0'),ms=String(mm).padStart(2,'0');
+  a.itens.forEach(function(it){
+    var txt=normHist(it.texto),melhor=null;
+    regras.forEach(function(r){if(txt.indexOf(r.n)>=0&&(!melhor||r.n.length>melhor.n.length))melhor=r;});
+    if(!melhor){res.semRegra.push(it);return;}
+    var nota=(it.texto.match(/Nota\s*N[oº°]?\.?:?\s*(\d+)/i)||[])[1]||'';
+    res.lancs.push({tipo:melhor.t.key,valor:it.valor,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano,nota:nota},auto:true});
+  });
+  return res;
+}
+
+/* Placeholders por filial: {filialnome} = MATRIZ / FILIAL TO · {filialsigla} = MTZ / FL TO
+   (matriz = CNPJ terminado em 0001; UF vem do cadastro da filial). Sem UF, usa o {filiallabel}. */
+function filialPlaceholders(e,fil){
+  var fs=e?getFiliais(e):[],f=null;fs.forEach(function(x){if(String(x.fil)===String(fil))f=x;});
+  var lbl=filialLabel(fil);
+  var matriz=f?/0001\d{2}$/.test(normCnpj(f.cnpj)):String(fil)==='1';
+  if(matriz)return{filiallabel:lbl,filialnome:'MATRIZ',filialsigla:'MTZ'};
+  var uf=f&&f.uf?String(f.uf).toUpperCase():'';
+  return{filiallabel:lbl,filialnome:uf?'FILIAL '+uf:lbl,filialsigla:uf?'FL '+uf:lbl};
+}
+function resolveHist(tpl,ex){
+  var h=String(tpl||'');
+  if(ex)Object.keys(ex).forEach(function(k){h=h.split('{'+k+'}').join(ex[k]||'');});
+  return h.replace(/\{[^}]+\}/g,'');
+}
+
+function getTipos(e){
+  var mapa=e.mapeamento||{},out=[];
+  PADRAO.forEach(function(t){var m=mapa[t.key]||{};out.push({key:t.key,label:m.label||t.label,hist:m.hist||t.hist,deb:m.deb||t.deb,cred:m.cred||t.cred,ativo:m.ativo!==false});});
+  Object.keys(mapa).forEach(function(k){if(PKEYS.indexOf(k)===-1){var m=mapa[k];out.push({key:k,label:m.label||k,hist:m.hist||'',deb:m.deb||'',cred:m.cred||'',ativo:m.ativo!==false});}});
+  return out;
+}
+
+/* ═══════ LANÇAMENTOS COM VALOR MANUAL (ex.: diferenças da 4E) ═══════
+   Tipos com chave "manual_..." ficam com contas e histórico fixos no cadastro da empresa;
+   o valor é digitado na prévia de cada PDF. Valor negativo inverte Débito/Crédito. */
+function tiposManuais(e){
+  return getTipos(e).filter(function(t){return t.key.indexOf('manual_')===0&&t.ativo;});
+}
+function parseValorManual(s){
+  s=String(s||'').trim().replace(/\s/g,'').replace(/^R\$/i,'');
+  if(!s)return NaN;
+  if(s.indexOf(',')>=0)return parseValorBR(s);
+  return parseFloat(s);
+}
+function fmtValorBR(v){
+  var neg=v<0;v=Math.abs(v);
+  var p=v.toFixed(2).split('.');
+  return(neg?'-':'')+p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+p[1];
+}
+function setManual(id,key,val){
+  var a=arquivos.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.manuais=a.manuais||{};
+  var v=parseValorManual(val);
+  if(isNaN(v)||v===0)delete a.manuais[key];else a.manuais[key]=v;
+  renderPreviewAll();
+}
+/* Lançamentos lidos do PDF + os digitados manualmente para este arquivo */
+function lancsComManuais(a,e){
+  var out=(a.lancamentos||[]).slice();
+  if(a.mesano)out=out.concat(itensAutoDoLivro(a,e).lancs);
+  if(!a.manuais||!a.mesano)return out;
+  var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
+  var ld=new Date(yy,mm,0).getDate();
+  var dd=String(ld).padStart(2,'0'),ms=String(mm).padStart(2,'0');
+  var ativos={};tiposManuais(e).forEach(function(t){ativos[t.key]=true;});
+  Object.keys(a.manuais).forEach(function(k){
+    var v=a.manuais[k];if(!ativos[k]||isNaN(v)||!v)return;
+    out.push({tipo:k,valor:Math.abs(v),inverter:v<0,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
+  });
+  return out;
+}
+/* Resumo do que foi lido do livro: itens sem regra cadastrada e saldo do período */
+function blocoLivro(a,e){
+  if(a.manualOnly)return'';
+  var html='',auto=itensAutoDoLivro(a,e);
+  var NOMES={'002':'Outros débitos','003':'Estorno de créditos','006':'Outros créditos','007':'Estorno de débitos','012':'Deduções'};
+  if(auto.lancs.length)html+='<div class="alert alert-ok" style="margin-top:8px"><i class="ti ti-check"></i><span>'+auto.lancs.length+' item(ns) discriminado(s) no livro casaram com regras da empresa e já estão na prévia.</span></div>';
+  if(auto.semRegra.length)html+='<div class="alert alert-info" style="margin-top:8px;flex-direction:column;align-items:flex-start;gap:4px"><div><i class="ti ti-info-circle"></i> Itens do livro <strong>sem regra cadastrada</strong> (não lançados):</div>'+
+    auto.semRegra.map(function(it){return'<div style="font-size:11px">'+esc(it.secao)+' · '+esc(NOMES[it.secao]||'')+' — '+esc(it.texto.slice(0,110))+' — <strong>R$ '+fmtValorBR(it.valor)+'</strong></div>';}).join('')+
+    '<div style="font-size:11px">Para lançar sozinho nos próximos meses, cadastre em Empresas um tipo com esse histórico.</div></div>';
+  var r=a.resumo||{};
+  if(r.v013!==null&&r.v013!==undefined||r.v014)html+='<div style="font-size:11px;color:#5F5E5A;margin-top:6px">Livro: 004 Subtotal débitos <strong>R$ '+fmtValorBR(r.v004||0)+'</strong> · 010 Total créditos <strong>R$ '+fmtValorBR(r.v010||0)+'</strong> · 013 Imposto a recolher <strong>R$ '+fmtValorBR(r.v013||0)+'</strong>'+(r.v014?' · 014 Saldo credor <strong>R$ '+fmtValorBR(r.v014)+'</strong>':'')+
+    '<br>Créditos na apuração: '+((r.v013||0)>0?'há imposto a recolher, usa o <strong>010</strong>':'há saldo credor ou saldo zero, usa o <strong>004</strong>')+'.</div>';
+  return html;
+}
+function blocoManuais(a,e){
+  var ts=tiposManuais(e);if(!ts.length)return'';
+  var autoPorTipo={};if(a.mesano)itensAutoDoLivro(a,e).lancs.forEach(function(l){autoPorTipo[l.tipo]=(autoPorTipo[l.tipo]||0)+l.valor;});
+  if(!a.mesano)return'<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Competência não encontrada no PDF — não é possível lançar valores manuais.</span></div>';
+  a.manuais=a.manuais||{};
+  return '<div style="margin-top:10px;padding:10px 12px;border:0.5px dashed #0AE18C;border-radius:8px;background:#F7FDFA">'+
+    '<div style="font-size:12px;font-weight:500;margin-bottom:6px"><i class="ti ti-pencil"></i> Lançamentos com valor manual</div>'+
+    ts.map(function(t){
+      var v=a.manuais[t.key];
+      var falta=!t.deb||!t.cred;
+      var lidos=autoPorTipo[t.key];
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:180px;font-size:12px">'+esc(t.label)+
+          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+
+          (lidos?' <span style="color:#00682F;font-weight:500">· lido do PDF: '+fmtValorBR(lidos)+' (já incluído; só digite se houver valor a mais)</span>':'')+'</div></div>'+
+        '<input type="text" inputmode="decimal" placeholder="0,00" value="'+(v?fmtValorBR(v):'')+'" '+
+          'onchange="setManual(\''+a.id+'\',\''+esc(t.key)+'\',this.value)" '+
+          'style="width:140px;height:32px;padding:0 10px;border:0.5px solid #D3D1C7;border-radius:8px;font-size:13px;text-align:right">'+
+      '</div>';
+    }).join('')+
+    '<div style="font-size:10px;color:#888">Deixe em branco ou 0 para não lançar. Valor negativo inverte Débito e Crédito.</div>'+
+  '</div>';
+}
+
+
+/* ═══ Winthor TXT (layout C3 PC Sistemas, largura fixa 279, CRLF) ═══ */
+function txtAscii(s){
+  return String(s===null||s===undefined?'':s).replace(/\r?\n/g,' ').toUpperCase()
+    .replace(/§/g,'S').replace(/º/g,'o').replace(/ª/g,'a').replace(/°/g,'o')
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\x20-\x7E]/g,' ');
+}
+function padE(v,n){var s=String(v===null||v===undefined?'':v);return s.length>=n?s.slice(s.length-n):' '.repeat(n-s.length)+s;}
+function padD(v,n){var s=String(v===null||v===undefined?'':v);return s.length>=n?s.slice(0,n):s+' '.repeat(n-s.length);}
+function linhaTxtC3(r){
+  /* r = ['C3',num,conta,DDMMAAAA,'D'|'C',doc,valor22,codH,hist,'N',_,filial] (mesmo array do XLSX) */
+  return 'C3'+String(r[1]).padStart(10,'0')+padE(r[2],12)+String(r[3])+r[4]+padE(r[5]?r[5]:'',15)+
+    String(r[6])+padE(r[7],4)+padD(txtAscii(r[8]),200)+(r[9]||'N')+'0'+padE(r[11],2)+' ';
+}
+function winRowsParaTxt(rows,cab){
+  var linhas=[padD(String(cab||''),14)].concat(rows.map(linhaTxtC3));
+  return linhas.join('\r\n')+'\r\n';
+}
+/* Cabeçalho (1ª linha) do TXT — cadastro da empresa; padrão igual ao arquivo de referência da 4E */
+var TXT_CAB_PADRAO='0001641';
+function txtCab(e){var c=e&&e.mapeamento&&e.mapeamento.txt_cab;return String(c||TXT_CAB_PADRAO).trim();}
+/* Formato do arquivo Winthor (XLSX ou TXT), escolhido nas abas e lembrado neste navegador */
+var FMT_KEY='apur_fmt_win';
+function formatoWin(){try{return localStorage.getItem(FMT_KEY)==='txt'?'txt':'xlsx';}catch(e){return'xlsx';}}
+function setFormatoWin(v){try{localStorage.setItem(FMT_KEY,v==='txt'?'txt':'xlsx');}catch(e){}
+  document.querySelectorAll('.fmt-win').forEach(function(sel){sel.value=formatoWin();});}
+function seletorFormato(ctx){
+  var f=formatoWin();
+  return '<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin:.25rem 0 .4rem;font-size:12px;color:#5F5E5A">'+
+    '<label for="fmt-win-'+ctx+'">Arquivo Winthor (rotina 2127):</label>'+
+    '<select id="fmt-win-'+ctx+'" class="fmt-win" onchange="setFormatoWin(this.value)" style="height:30px;border:0.5px solid #D3D1C7;border-radius:8px;padding:0 8px;font-size:12px">'+
+      '<option value="xlsx"'+(f==='xlsx'?' selected':'')+'>Excel (.xlsx)</option><option value="txt"'+(f==='txt'?' selected':'')+'>Texto (.txt)</option></select></div>';
+}
+/* Salva as linhas Winthor no formato escolhido. Em TXT sai um arquivo por empresa (cada uma com o seu cabeçalho). */
+function salvarWinthor(prefixo,aba,my,grupos){
+  var ks=Object.keys(grupos).filter(function(k){return grupos[k].length;});if(!ks.length)return 0;
+  if(formatoWin()==='txt'){
+    ks.forEach(function(k){
+      var e=db.empresas[k];
+      saveFile(prefixo+'_WINTHOR_'+normCnpj((e&&e.cnpj)||k)+'_'+my+'.txt',winRowsParaTxt(grupos[k],txtCab(e)));
+    });
+    return ks.length;
+  }
+  var rows=[];ks.forEach(function(k){rows=rows.concat(grupos[k]);});
+  var wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:6},{wch:8},{wch:12},{wch:10},{wch:10},{wch:12},{wch:24},{wch:7},{wch:55},{wch:11},{wch:3},{wch:7}];
+  XLSX.utils.book_append_sheet(wb,ws,aba);
+  saveXlsx(wb,prefixo+'_WINTHOR_'+my+'.xlsx');return 1;
+}
+
+/* ═══════ EXCLUIR / SUBSTITUIR / LIMPAR ARQUIVOS CARREGADOS ═══════
+   ctx: 'ap' = Apuração (PDF), 'pc' = PIS/COFINS (planilha), 'dp' = Depreciação (PDF) */
+var CTX_ARQ={
+  ap:{lista:function(){return arquivos;},set:function(v){arquivos=v;},render:function(){renderPreviewAll();},ler:function(f){return readOnePdf(f).then(function(r){return[r];});},accept:'.pdf',drop:'drop',nome:'drop-name'},
+  pc:{lista:function(){return arquivosPC;},set:function(v){arquivosPC=v;},render:function(){renderPreviewPC();},ler:function(f){return readOneXlsxPC(f).then(function(r){return[r];});},accept:'.xlsx,.xls',drop:'drop-pc',nome:'drop-name-pc'},
+  dp:{lista:function(){return arquivosDP;},set:function(v){arquivosDP=v;},render:function(){renderPreviewDP();},ler:function(f){return readOnePdfDP(f);},accept:'.pdf',drop:'drop-dp',nome:'drop-name-dp'}
+};
+function botoesArquivo(ctx,id){
+  var c=CTX_ARQ[ctx],a=c.lista().filter(function(x){return x.id===id;})[0]||{};
+  return '<div style="display:flex;gap:6px;flex-shrink:0">'+
+    (a.manualOnly?'':'<label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0" title="Trocar por outro arquivo, mantendo os valores digitados"><i class="ti ti-replace"></i> Substituir'+
+      '<input type="file" accept="'+c.accept+'" style="display:none" onchange="substituirArquivo(\''+ctx+'\',\''+id+'\',this)"></label>')+
+    '<button class="btn btn-danger btn-sm" type="button" onclick="excluirArquivo(\''+ctx+'\',\''+id+'\')" title="Tirar da lista"><i class="ti ti-trash"></i> Excluir</button></div>';
+}
+function botaoUsarEste(ctx,a){
+  if(!a.duplicadoDeId)return'';
+  return '<button class="btn btn-secondary btn-sm" type="button" style="margin-top:6px" onclick="excluirArquivo(\''+ctx+'\',\''+a.duplicadoDeId+'\')"><i class="ti ti-check"></i> Usar este e excluir o anterior</button>';
+}
+function cabecalhoPrevia(ctx,titulo){
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:.4rem">'+
+    '<div class="step-label" style="margin-bottom:0">'+titulo+'</div>'+
+    '<button class="btn btn-secondary btn-sm" type="button" id="limpar-'+ctx+'" style="display:none" onclick="limparArquivos(\''+ctx+'\')"><i class="ti ti-trash"></i> Limpar todos</button>'+
+  '</div><div class="divider"></div>';
+}
+function atualizarLimpar(ctx){
+  var b=document.getElementById('limpar-'+ctx);if(b)b.style.display=CTX_ARQ[ctx].lista().length?'':'none';
+}
+function excluirArquivo(ctx,id){
+  var c=CTX_ARQ[ctx];c.set(c.lista().filter(function(x){return x.id!==id;}));
+  if(!c.lista().length){var d=document.getElementById(c.drop);if(d)d.classList.remove('done');var n=document.getElementById(c.nome);if(n){n.textContent='';n.style.display='none';}}
+  c.render();
+}
+function limparArquivos(ctx){
+  var n=CTX_ARQ[ctx].lista().length;if(!n)return;
+  openModal('<h3>Limpar a lista</h3><p style="font-size:13px;margin-top:8px">Tirar os '+n+' item(ns) carregados desta aba, inclusive os valores digitados? O cadastro das empresas não é alterado.</p>'+
+    '<div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-danger" onclick="closeModal();_limparArquivos(\''+ctx+'\')"><i class="ti ti-trash"></i> Limpar todos</button></div>');
+}
+function _limparArquivos(ctx){
+  var c=CTX_ARQ[ctx];c.set([]);
+  var d=document.getElementById(c.drop);if(d)d.classList.remove('done');
+  var n=document.getElementById(c.nome);if(n){n.textContent='';n.style.display='none';}
+  c.render();
+}
+function substituirArquivo(ctx,id,input){
+  var f=input.files&&input.files[0];input.value='';if(!f)return;
+  var c=CTX_ARQ[ctx],antigo=c.lista().filter(function(x){return x.id===id;})[0];if(!antigo)return;
+  c.ler(f).then(function(novos){
+    var lista=c.lista(),i=lista.indexOf(antigo);if(i<0)return;
+    novos.forEach(function(r,j){
+      r.id=j===0?id:id+'_'+j;
+      /* mantém valores digitados e a empresa/filial escolhidas, se o novo arquivo for da mesma empresa */
+      if(!r.erro&&!r.empresaKey&&antigo.empresaKey){r.empresaKey=antigo.empresaKey;r.filial=antigo.filial;}
+      if(antigo.manuais&&r.empresaKey===antigo.empresaKey)r.manuais=antigo.manuais;
+    });
+    lista.splice.apply(lista,[i,1].concat(novos));
+    c.render();
+  });
+}
+
+/* ═══════ LANÇAMENTO SEM ARQUIVO ═══════
+   Para competências sem PDF/planilha (ex.: só diferenças e provisões): escolhe empresa, filial e
+   competência e digita os valores dos lançamentos manuais. ctx 'ap' = Apuração, 'pc' = PIS/COFINS. */
+function cardSemArquivo(ctx){
+  var keys=Object.keys(db.empresas);
+  return '<div class="card" id="sa-card-'+ctx+'" style="margin-top:-.25rem">'+
+    '<div style="font-size:12px;font-weight:500;margin-bottom:8px"><i class="ti ti-pencil-plus"></i> Sem arquivo? Lance só os valores digitados</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'+
+      '<div class="field" style="margin:0;flex:1;min-width:180px"><label for="sa-emp-'+ctx+'">Empresa</label><select id="sa-emp-'+ctx+'" onchange="saEmpChange(\''+ctx+'\')"><option value="">— selecione —</option>'+
+        keys.map(function(k){return'<option value="'+esc(k)+'">'+esc(db.empresas[k].nome)+'</option>';}).join('')+'</select></div>'+
+      '<div class="field" style="margin:0;width:150px"><label for="sa-fil-'+ctx+'">Filial</label><select id="sa-fil-'+ctx+'"><option value="">—</option></select></div>'+
+      '<div class="field" style="margin:0;width:110px"><label for="sa-mes-'+ctx+'">Competência</label><input id="sa-mes-'+ctx+'" placeholder="MM/AAAA" maxlength="7" inputmode="numeric"></div>'+
+      '<button class="btn btn-secondary" type="button" onclick="addSemArquivo(\''+ctx+'\')"><i class="ti ti-plus"></i> Adicionar</button>'+
+    '</div><div class="status-msg" id="sa-st-'+ctx+'" style="text-align:left"></div></div>';
+}
+function saEmpChange(ctx){
+  var k=(document.getElementById('sa-emp-'+ctx)||{}).value,sel=document.getElementById('sa-fil-'+ctx);if(!sel)return;
+  var fs=k&&db.empresas[k]?getFiliais(db.empresas[k]):[];
+  sel.innerHTML=fs.map(function(f){return'<option value="'+esc(f.fil)+'">FIL '+esc(f.fil)+(f.uf?' ('+esc(f.uf)+')':'')+'</option>';}).join('')||'<option value="">—</option>';
+}
+function refreshCardsSemArquivo(){
+  ['ap','pc'].forEach(function(ctx){
+    var el=document.getElementById('sa-card-'+ctx);if(!el)return;
+    var k=(document.getElementById('sa-emp-'+ctx)||{}).value||'';
+    var tmp=document.createElement('div');tmp.innerHTML=cardSemArquivo(ctx);el.replaceWith(tmp.firstChild);
+    var s2=document.getElementById('sa-emp-'+ctx);if(s2&&k&&db.empresas[k]){s2.value=k;saEmpChange(ctx);}
+  });
+}
+function addSemArquivo(ctx){
+  var k=(document.getElementById('sa-emp-'+ctx)||{}).value,fil=(document.getElementById('sa-fil-'+ctx)||{}).value;
+  var mes=((document.getElementById('sa-mes-'+ctx)||{}).value||'').trim(),st=document.getElementById('sa-st-'+ctx);
+  var m=mes.match(/^(\d{1,2})\s*[\/\-]\s*(\d{4})$/);
+  if(!k||!db.empresas[k]){st.textContent='Escolha a empresa.';st.className='status-msg err';return;}
+  if(!m||+m[1]<1||+m[1]>12){st.textContent='Informe a competência no formato MM/AAAA.';st.className='status-msg err';return;}
+  var e=db.empresas[k],mesano=String(+m[1]).padStart(2,'0')+'/'+m[2];
+  var f=getFiliais(e).filter(function(x){return String(x.fil)===String(fil);})[0]||getFiliais(e)[0]||{};
+  var a={id:(ctx==='pc'?'p':'a')+Date.now()+Math.random().toString(36).slice(2,7),nome:'Lançamento sem arquivo',mesano:mesano,cnpj:f.cnpj||'',
+    lancamentos:[],empresaKey:k,filial:f.fil||fil||null,manualOnly:true,manuais:{}};
+  if(ctx==='pc'){arquivosPC.push(a);renderPreviewPC();}else{arquivos.push(a);renderPreviewAll();}
+  st.textContent='Adicionado abaixo: '+e.nome+' · FIL '+(a.filial||'—')+' · '+mesano+'. Digite os valores na prévia.';st.className='status-msg ok';
+}
+
+/* ═══════ PIS/COFINS: valores digitados para os tipos extras (pcextra_) ═══════ */
+function tiposManuaisPC(e){
+  return getTiposPC(e).filter(function(t){return t.key.indexOf('pcextra_')===0&&t.ativo;});
+}
+function setManualPC(id,key,val){
+  var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.manuais=a.manuais||{};
+  var v=parseValorManual(val);
+  if(isNaN(v)||v===0)delete a.manuais[key];else a.manuais[key]=v;
+  renderPreviewPC();
+}
+/* Valores lidos da planilha que o usuário corrigiu na prévia (Winthor: 4E, Safra...).
+   a.editados[índice] = novo valor; 0 tira a linha; negativo inverte Débito/Crédito. */
+function pcEditavel(e){return!!e&&e.sistema==='winthor';}
+function setEditadoPC(id,idx,val){
+  var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.editados=a.editados||{};
+  var s=String(val||'').trim(),orig=((a.lancamentos||[])[idx]||{}).valor;
+  if(!s){delete a.editados[idx];renderPreviewPC();return;}
+  var v=parseValorManual(s);
+  if(isNaN(v)){renderPreviewPC();return;}
+  v=Math.round(v*100)/100;
+  if(orig!==undefined&&Math.abs(v-orig)<0.005)delete a.editados[idx];else a.editados[idx]=v;
+  renderPreviewPC();
+}
+function restaurarEditadosPC(id){
+  var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.editados={};renderPreviewPC();
+}
+function lancsLidosPC(a,e){
+  var ed=pcEditavel(e)&&a.editados?a.editados:null,out=[];
+  (a.lancamentos||[]).forEach(function(l,i){
+    if(!ed||!(i in ed)){out.push(l);return;}
+    var v=ed[i];if(!v)return;
+    var c={};for(var k in l)c[k]=l[k];
+    c.valor=Math.abs(v);c.inverter=v<0;c.editado=true;out.push(c);
+  });
+  return out;
+}
+function blocoEditaveisPC(a,e){
+  if(!pcEditavel(e)||a.manualOnly||!(a.lancamentos||[]).length)return'';
+  var tiposMap={};getTiposPC(e).forEach(function(t){tiposMap[t.key]=t;});
+  a.editados=a.editados||{};
+  var nEd=Object.keys(a.editados).length;
+  return '<div style="margin-top:10px;padding:10px 12px;border:0.5px solid #D3D1C7;border-radius:8px;background:#FAFAF8">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+      '<div style="font-size:12px;font-weight:500"><i class="ti ti-edit"></i> PIS/COFINS lidos da planilha — edite se precisar</div>'+
+      (nEd?'<button type="button" class="btn btn-secondary btn-sm" onclick="restaurarEditadosPC(\''+a.id+'\')"><i class="ti ti-arrow-back-up"></i> Restaurar valores da planilha ('+nEd+')</button>':'')+
+    '</div>'+
+    a.lancamentos.map(function(l,i){
+      var t=tiposMap[l.tipo]||{label:l.tipo},ed=(i in a.editados),v=ed?a.editados[i]:l.valor;
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:180px;font-size:12px">'+esc(t.label)+
+          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+
+          (ed?' <span style="color:#B26A00;font-weight:500">· editado (planilha: '+fmtValorBR(l.valor)+')'+(v===0?' — não será lançado':'')+'</span>':'')+'</div></div>'+
+        '<input type="text" inputmode="decimal" aria-label="Valor '+esc(t.label)+'" value="'+fmtValorBR(v)+'" '+
+          'onchange="setEditadoPC(\''+a.id+'\','+i+',this.value)" '+
+          'style="width:140px;height:32px;padding:0 10px;border:0.5px solid '+(ed?'#F0A030':'#D3D1C7')+';border-radius:8px;font-size:13px;text-align:right'+(ed?';background:#FFF8EC':'')+'">'+
+      '</div>';
+    }).join('')+
+    '<div style="font-size:10px;color:#888">Apague o campo para voltar ao valor da planilha. 0 tira a linha; valor negativo inverte Débito e Crédito.</div>'+
+  '</div>';
+}
+function lancsComManuaisPC(a,e){
+  var out=lancsLidosPC(a,e);
+  if(!a.manuais||!a.mesano)return out;
+  var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
+  var dd=String(new Date(yy,mm,0).getDate()).padStart(2,'0'),ms=String(mm).padStart(2,'0');
+  var ativos={};tiposManuaisPC(e).forEach(function(t){ativos[t.key]=true;});
+  Object.keys(a.manuais).forEach(function(k){
+    var v=a.manuais[k];if(!ativos[k]||isNaN(v)||!v)return;
+    out.push({tipo:k,valor:Math.abs(v),inverter:v<0,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
+  });
+  return out;
+}
+function blocoManuaisPC(a,e){
+  var ts=tiposManuaisPC(e);if(!ts.length)return'';
+  if(!a.mesano)return'';
+  a.manuais=a.manuais||{};
+  return '<details style="margin-top:10px;padding:10px 12px;border:0.5px dashed #0AE18C;border-radius:8px;background:#F7FDFA"'+(a.manualOnly||Object.keys(a.manuais).length?' open':'')+'>'+
+    '<summary style="font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-pencil"></i> Valores digitados — '+ts.length+' tipos de PIS/COFINS desta empresa</summary><div style="margin-top:8px">'+
+    ts.map(function(t){
+      var v=a.manuais[t.key],falta=!t.deb||!t.cred;
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:180px;font-size:12px">'+esc(t.label)+
+          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+'</div></div>'+
+        '<input type="text" inputmode="decimal" placeholder="0,00" aria-label="Valor '+esc(t.label)+'" value="'+(v?fmtValorBR(v):'')+'" '+
+          'onchange="setManualPC(\''+a.id+'\',\''+esc(t.key)+'\',this.value)" '+
+          'style="width:140px;height:32px;padding:0 10px;border:0.5px solid #D3D1C7;border-radius:8px;font-size:13px;text-align:right">'+
+      '</div>';
+    }).join('')+
+    '<div style="font-size:10px;color:#888">Deixe em branco ou 0 para não lançar. Valor negativo inverte Débito e Crédito.</div>'+
+  '</div></details>';
+}
+function tabelaWinthor(linhas,max){
+  var cols=['NÚM','COD RED','DATA','NAT','VALOR','HISTÓRICO','FIL'];
+  return '<table class="preview-table" style="margin-top:8px"><tr>'+cols.map(function(c){return'<th>'+c+'</th>';}).join('')+'</tr>'+
+    linhas.slice(0,max).map(function(r){return'<tr><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td><td>'+r[6]+'</td><td>'+esc(String(r[8]).slice(0,45))+'</td><td>'+r[11]+'</td></tr>';}).join('')+
+    (linhas.length>max?'<tr><td colspan="7" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-max)+' linhas</td></tr>':'')+'</table>';
+}
+
+function setArquivoEmpresa(id,k){
+  var a=arquivos.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.empresaKey=k||null;
+  var fs=k&&db.empresas[k]?getFiliais(db.empresas[k]):[];
+  a.filial=fs.length===1?fs[0].fil:null; /* se houver mais de uma filial cadastrada para essa empresa, precisa escolher qual */
+  renderPreviewAll();
+}
+function setArquivoFilial(id,fil){
+  var a=arquivos.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.filial=fil||null;renderPreviewAll();
+}
+function removerArquivo(id){
+  arquivos=arquivos.filter(function(x){return x.id!==id;});renderPreviewAll();
+}
+
+/* Marca como duplicado qualquer PDF carregado que tenha o mesmo CNPJ + mesma competência (mês/ano)
+   de outro já carregado antes dele. Mantém o primeiro como "válido" e os demais como duplicata,
+   para que a mesma apuração não seja somada/gerada mais de uma vez por engano. */
+function marcarDuplicados(){
+  var vistos={};
+  arquivos.forEach(function(a){
+    if(a.erro||a.manualOnly){a.duplicado=false;return;}
+    var chave=normCnpj(a.cnpj)+'|'+(a.mesano||'');
+    if(chave==='|'){a.duplicado=false;return;}
+    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave].nome;a.duplicadoDeId=vistos[chave].id;}
+    else{a.duplicado=false;vistos[chave]=a;}
+  });
+}
+
+function renderPreviewAll(){
+  marcarDuplicados();atualizarLimpar('ap');
+  var prevEl=document.getElementById('prev-card');
+  var novosEl=document.getElementById('novos-alert');
+  var alertEl=document.getElementById('apur-alerts');
+  var btn=document.getElementById('btn-gerar');
+  if(novosEl)novosEl.innerHTML='';if(alertEl)alertEl.innerHTML='';
+  if(!arquivos.length){if(prevEl)prevEl.innerHTML='<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar as filiais automaticamente pelo CNPJ.</div>';if(btn)btn.disabled=true;return;}
+  var empKeys=Object.keys(db.empresas);
+  var p={canEdit:ME.canEdit};
+  var novosGlobal={};
+  var totalLinhasGeraveis=0;
+  var html=arquivos.map(function(a){
+    if(a.erro){
+      return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><strong>'+esc(a.nome)+'</strong>'+
+        botoesArquivo('ap',a.id)+'</div>'+
+        '<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Erro ao ler PDF: '+esc(a.erro)+'</span></div></div>';
+    }
+    var e=a.empresaKey?db.empresas[a.empresaKey]:null;
+    var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+      '<div><strong>'+esc(a.nome)+'</strong><div style="font-size:11px;color:#888;margin-top:2px">'+(a.manualOnly?'Valores digitados':'CNPJ no PDF: '+esc(a.cnpj||'não encontrado'))+' &nbsp;·&nbsp; Competência: '+esc(a.mesano||'—')+'</div></div>'+
+      botoesArquivo('ap',a.id)+'</div>';
+    var empBlock;
+    var fsEmp=e?getFiliais(e):[];
+    if(e&&(a.filial||fsEmp.length<=1)){
+      var filUsada=a.filial||(fsEmp[0]&&fsEmp[0].fil)||'1';
+      empBlock='<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><i class="ti ti-check" style="color:#0AE18C"></i><span style="font-size:12px">Empresa identificada: <strong>'+esc(e.nome)+'</strong>'+(fsEmp.length>1?' — FIL <strong>'+esc(filUsada)+'</strong> ('+esc(filialLabel(filUsada))+')':'')+'</span>'+sisPill(e.sistema)+'</div>';
+    } else if(e&&fsEmp.length>1){
+      empBlock='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>"'+esc(e.nome)+'" tem '+fsEmp.length+' filiais cadastradas e o CNPJ deste PDF ('+esc(a.cnpj||'?')+') não bateu com nenhuma. Selecione a filial correta:</span></div>'+
+        '<select onchange="setArquivoFilial(\''+a.id+'\',this.value)" style="margin-top:4px">'+
+          '<option value="">— selecione a filial —</option>'+
+          fsEmp.map(function(f){return'<option value="'+esc(f.fil)+'">FIL '+esc(f.fil)+' ('+esc(filialLabel(f.fil))+') — '+esc(f.cnpj)+'</option>';}).join('')+
+        '</select>';
+    } else {
+      empBlock='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Não foi possível identificar a empresa pelo CNPJ. Selecione manualmente:</span></div>'+
+        '<select onchange="setArquivoEmpresa(\''+a.id+'\',this.value)" style="margin-top:4px">'+
+          '<option value="">— selecione a empresa —</option>'+
+          empKeys.map(function(k){var em=db.empresas[k],fk=getFiliais(em);return'<option value="'+k+'">'+esc(em.nome)+' ('+(fk.length>1?fk.length+' filiais':esc((fk[0]&&fk[0].cnpj)||em.cnpj||''))+')</option>';}).join('')+
+        '</select>';
+    }
+    var filialResolvida=e?(a.filial||(fsEmp.length===1?fsEmp[0].fil:null)):null;
+    var body='';
+    if(e && a.duplicado){
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>PDF duplicado — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'", já carregado. Estas linhas <strong>não</strong> serão geradas de novo.</span></div>'+botaoUsarEste('ap',a);
+    } else if(e&&!filialResolvida){
+      body='<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px">Selecione a filial acima para pré-visualizar os lançamentos.</div>';
+    } else if(e){
+      var tipos=getTipos(e);var tiposMap={};tipos.forEach(function(t){tiposMap[t.key]=t;});
+      var lancsAll=lancsComManuais(a,e);var tiposNoLanc={};lancsAll.forEach(function(l){tiposNoLanc[l.tipo]=true;});
+      var naoMapeados=Object.keys(tiposNoLanc).filter(function(k){return !tiposMap[k];});
+      naoMapeados.forEach(function(k){novosGlobal[k]=novosGlobal[k]||[];novosGlobal[k].push(a.empresaKey);});
+      var warns=[];tipos.forEach(function(t){if(tiposNoLanc[t.key]&&t.ativo&&(!t.deb||!t.cred))warns.push(t.label);});
+      if(warns.length&&alertEl)warns.forEach(function(w){alertEl.innerHTML+='<div class="alert alert-warn"><i class="ti ti-alert-triangle"></i><span>'+esc(e.nome)+' — conta em branco para: <strong>'+esc(w)+'</strong></span></div>';});
+      var linhas=e.sistema==='dominio'?linhasDomFor(lancsAll,e,tipos,filialResolvida):linhasWinFor(lancsAll,e,tipos,filialResolvida);
+      totalLinhasGeraveis+=linhas.length;
+      if(!linhas.length){
+        body='<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px">'+(a.manualOnly?'Digite os valores abaixo.':'O livro foi lido, mas não há lançamento a gerar com as regras desta empresa (veja o resumo abaixo).')+'</div>';
+      } else if(e.sistema==='dominio'){
+        body='<table class="preview-table" style="margin-top:8px"><tr><th>Data</th><th>Débito</th><th>Crédito</th><th>Valor</th><th>Histórico</th></tr>'+
+          linhas.slice(0,6).map(function(l){return'<tr><td>'+l.dDisp+'</td><td>'+l.deb+'</td><td>'+l.cred+'</td><td>'+l.val.toFixed(2).replace('.',',')+'</td><td>'+esc(l.hist.slice(0,50))+(l.hist.length>50?'…':'')+'</td></tr>';}).join('')+
+          (linhas.length>6?'<tr><td colspan="5" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-6)+' linhas</td></tr>':'')+'</table>';
+      } else {
+        var cols=['NÚM','COD RED','DATA','VALOR','HISTÓRICO','FIL'];
+        body='<table class="preview-table" style="margin-top:8px"><tr>'+cols.map(function(c){return'<th>'+c+'</th>';}).join('')+'</tr>'+
+          linhas.slice(0,6).map(function(r){return'<tr><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[6]+'</td><td>'+esc(String(r[8]).slice(0,40))+'</td><td>'+r[11]+'</td></tr>';}).join('')+
+          (linhas.length>6?'<tr><td colspan="6" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-6)+' linhas</td></tr>':'')+'</table>';
+      }
+    }
+    if(e&&!a.duplicado&&filialResolvida)body+=blocoLivro(a,e)+blocoManuais(a,e);
+    return '<div class="card">'+head+empBlock+body+'</div>';
+  }).join('');
+  if(prevEl)prevEl.innerHTML=html;
+  var novosKeys=Object.keys(novosGlobal);
+  if(novosKeys.length&&novosEl){
+    var nh='<div class="alert alert-info" style="flex-direction:column;align-items:flex-start;gap:8px">'+
+      '<div style="display:flex;align-items:center;gap:8px;font-weight:500"><i class="ti ti-sparkles"></i> Novos tipos detectados em algum PDF</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">'+novosKeys.map(function(k){return'<code style="background:#fff;border:0.5px solid #90CAF9;border-radius:6px;padding:2px 10px;font-size:11px">'+esc(k)+'</code>';}).join('')+'</div>'+
+      (p.canEdit?'<div style="font-size:11px">Acesse a aba <strong>Empresas</strong> para mapear as contas de cada tipo para a(s) empresa(s) envolvida(s).</div>':'<div style="font-size:11px">Solicite a um usuário autorizado que configure as contas para estes tipos.</div>')+
+      '</div>';
+    novosEl.innerHTML=nh;
+  }
+  if(!novosKeys.length&&!(alertEl&&alertEl.innerHTML)&&alertEl)alertEl.innerHTML='<div class="alert alert-ok"><i class="ti ti-check"></i><span>Pronto para gerar — <strong>'+totalLinhasGeraveis+'</strong> linhas no total.</span></div>';
+  if(btn)btn.disabled=!totalLinhasGeraveis;
+}
+
+function linhasDomFor(lancs,e,tipos,filOverride){
+  var out=[],lote=1,tm={};
+  (tipos||getTipos(e)).forEach(function(t){tm[t.key]=t;});
+  var fs=getFiliais(e);
+  var fil=filOverride||(fs[0]&&fs[0].fil)||'1';
+  var fl=filialLabel(fil);
+  lancs.forEach(function(l){
+    var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
+    var ex2=Object.assign({},l.ex,filialPlaceholders(e,fil));
+    out.push({dDisp:l.dDisp,dFmt:l.dFmt,deb:l.inverter?t.cred:t.deb,cred:l.inverter?t.deb:t.cred,val:l.valor,lote:lote,hist:resolveHist(t.hist,ex2)});lote++;
+  });
+  return out;
+}
+function fvw(v){var s=v.toFixed(2).replace('.',',');return s.padStart(22,'0').replace(',','.');}
+function winNum(v){var t=String(v===null||v===undefined?'':v).trim();return /^\d+$/.test(t)?parseInt(t,10):t;}
+function linhasWinFor(lancs,e,tipos,filOverride){
+  var mapa=e.mapeamento||{},codH=mapa.cod_h||'37';
+  var fs=getFiliais(e);
+  var fil=filOverride||(fs[0]&&fs[0].fil)||'1';
+  var fl=filialLabel(fil);
+  var tm={};(tipos||getTipos(e)).forEach(function(t){tm[t.key]=t;});
+  var out=[],num=1;
+  lancs.forEach(function(l){
+    var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
+    var ex2=Object.assign({},l.ex,filialPlaceholders(e,fil));
+    var vf=fvw(l.valor),hist=resolveHist(t.hist,ex2);
+    /* layout aceito pelo Winthor (conferido com importação real): data DDMMAAAA em texto,
+       conta/cod. histórico/filial/doc como número, DOC vazio quando não há nota, coluna 11 vazia */
+    var dWin=String(l.dDisp||'').replace(/\//g,'');
+    var doc=(l.ex&&l.ex.nota)?winNum(l.ex.nota):null;
+    var deb=winNum(l.inverter?t.cred:t.deb),cred=winNum(l.inverter?t.deb:t.cred);
+    out.push(['C3',1,deb,dWin,'D',doc,vf,winNum(codH),hist,'N',null,winNum(fil)]);
+    out.push(['C3',2,cred,dWin,'C',doc,vf,winNum(codH),hist,'N',null,winNum(fil)]);num++;
+  });
+  return out;
+}
+
+function gerarArquivo(){
+  marcarDuplicados();
+  var mesano='';arquivos.forEach(function(a){if(!mesano&&a.mesano)mesano=a.mesano;});
+  var my=mesano?mesano.replace('/','_'):'export';
+  var winGrupos={},domGroups={},pendentes=0,duplicados=0;
+  arquivos.forEach(function(a){
+    if(a.erro)return;
+    if(a.duplicado){duplicados++;return;}
+    if(!a.empresaKey||!db.empresas[a.empresaKey]){pendentes++;return;}
+    var e=db.empresas[a.empresaKey],tipos=getTipos(e),fs=getFiliais(e);
+    var fil=a.filial||(fs.length===1?fs[0].fil:null);
+    if(!fil){pendentes++;return;} /* empresa com múltiplas filiais e nenhuma escolhida ainda */
+    if(e.sistema==='winthor'){
+      winGrupos[a.empresaKey]=(winGrupos[a.empresaKey]||[]).concat(linhasWinFor(lancsComManuais(a,e),e,tipos,fil));
+    } else {
+      var linhas=linhasDomFor(lancsComManuais(a,e),e,tipos,fil);
+      if(linhas.length)domGroups[a.empresaKey]=(domGroups[a.empresaKey]||[]).concat(linhas);
+    }
+  });
+  var gerou=0;
+  gerou+=salvarWinthor('ICMS','ESTADUAIS',my,winGrupos);
+  Object.keys(domGroups).forEach(function(k){
+    var e=db.empresas[k],linhas=domGroups[k],codH=(e.mapeamento||{}).cod_h||'';
+    linhas.forEach(function(l,i){l.lote=i+1;}); /* renumera o lote sequencialmente caso mais de um PDF do mesmo CNPJ (ex.: meses diferentes) tenha entrado no mesmo lote */
+    var txt=linhas.map(function(l){return[l.dDisp,l.deb,l.cred,l.val.toFixed(2).replace('.',','),codH,l.hist,'','','',''].join(';');}).join('\r\n');
+    dl(txt,'ICMS_DOMINIO_'+e.cnpj.replace(/\D/g,'')+'_'+my+'.txt');gerou++;
+  });
+  if(!gerou){stA(pendentes?'Identifique a filial de todos os PDFs antes de gerar.':(duplicados?'Todos os PDFs carregados são duplicados de outros já processados.':'Nenhuma linha gerada.'),'err');return;}
+  stA(gerou+' arquivo(s) gerado(s)'+(pendentes?' — '+pendentes+' PDF(s) sem filial identificada foram ignorados.':'')+(duplicados?' — '+duplicados+' PDF(s) duplicado(s) foram ignorados.':'.'),(pendentes||duplicados)?'warn':'ok');
+}
+function stA(m,t){var el=document.getElementById('apur-st');if(el){el.textContent=m;el.className='status-msg'+(t?' '+t:'');}}
+
+/* ══════════════════ PIS/COFINS (Resumo em Excel) ══════════════════ */
+function panePisCofins(){
+  var keys=Object.keys(db.empresas);
+  return '<div class="step-label">1 — Planilhas Resumo de Apuração PIS/COFINS</div><div class="divider"></div>'+
+  '<div class="card">'+
+    '<div class="drop" id="drop-pc" onclick="document.getElementById(\'xlsx-pc-in\').click()">'+
+      '<i class="ti ti-file-spreadsheet" style="font-size:32px;color:#0AE18C;display:block;margin-bottom:6px"></i>'+
+      '<div class="drop-label">Clique ou arraste uma ou mais planilhas <strong>Resumo Apuração PIS/COFINS</strong> (.xlsx). Empresas Winthor geram o XLSX da rotina 2127, no mesmo layout do ICMS.</div>'+
+      '<div class="drop-name" id="drop-name-pc"></div>'+
+    '</div>'+
+    '<input type="file" id="xlsx-pc-in" accept=".xlsx,.xls" multiple style="display:none">'+
+  '</div>'+
+  '<div class="sem-emp"></div>'+
+  '<div id="novos-alert-pc"></div>'+
+  '<div id="apur-alerts-pc"></div>'+
+  cardSemArquivo('pc')+
+  cabecalhoPrevia('pc','2 — Empresas identificadas e prévia')+
+  '<div class="preview-wrap" id="prev-card-pc">'+
+    '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue as planilhas para identificar a empresa automaticamente pelo CNPJ.</div>'+
+  '</div>'+
+  seletorFormato('pc')+
+  '<button class="btn btn-primary btn-full" id="btn-gerar-pc" disabled onclick="gerarArquivoPC()" style="margin-top:.25rem">'+
+    '<i class="ti ti-download"></i> Gerar arquivo(s) de importação</button>'+
+  '<div class="status-msg" id="apur-st-pc"></div>';
+}
+function setupDropPC(){
+  var drop=document.getElementById('drop-pc'),inp=document.getElementById('xlsx-pc-in');
+  if(!drop||!inp||drop.getAttribute('data-ok'))return; /* liga os eventos uma vez só */
+  drop.setAttribute('data-ok','1');
+  ['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('over');});});
+  drop.addEventListener('dragleave',function(e){e.preventDefault();drop.classList.remove('over');});
+  drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('over');var fs=e.dataTransfer&&e.dataTransfer.files;if(fs&&fs.length)loadXlsxPC(fs);});
+  inp.addEventListener('change',function(){if(inp.files&&inp.files.length)loadXlsxPC(inp.files);inp.value='';});
+}
+/* Identifica a que "tipo" (linha do resumo) uma descrição corresponde, tolerando maiúsc./acentos */
+function detectarBasePisCofins(descNorm){
+  if(/DEVOLUCAO DE VENDAS/.test(descNorm))return'devolucao_vendas';
+  if(/DEVOLUCAO DE COMPRAS/.test(descNorm))return'devolucao_compras';
+  if(/PRESTACAO DE SERVICO/.test(descNorm))return'prestacao_servico';
+  if(/ESTORNOS? DE CREDITOS? BAIXA DE ESTOQUE/.test(descNorm))return'estorno_creditos_estoque';
+  if(/RECEITA FINANCEIRA/.test(descNorm))return'receita_financeira';
+  if(/CREDITO OUTORGADO/.test(descNorm))return'credito_outorgado';
+  if(/ENTRADA DE BONIFICACAO/.test(descNorm))return'entrada_bonificacao';
+  if(/COMPRAS PARA COMERCIALIZACAO/.test(descNorm))return'compras_comercializacao';
+  if(/INDUSTRIALIZACAO POR ENCOMENDA/.test(descNorm))return'industrializacao_encomenda';
+  if(/AQUISICAO DE SERVICO DE TRANSPORTE/.test(descNorm))return'aquisicao_transporte';
+  if(/ENERGIA ELETRICA/.test(descNorm))return'energia_eletrica';
+  if(/ALUGUEL IMOVEL/.test(descNorm))return'aluguel_imovel';
+  if(/^VENDAS/.test(descNorm))return'vendas';
+  return null;
+}
+function readOneXlsxPC(file){
+  return new Promise(function(resolve){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        var sheetName=wb.SheetNames.find(function(n){return!/aliquota\s*zero/i.test(n);})||wb.SheetNames[0];
+        var ws=wb.Sheets[sheetName];
+        var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+        var cnpj='',mesano='',colPis=-1,colCofins=-1;
+        rows.forEach(function(row){
+          (row||[]).forEach(function(cell,ci){
+            var s=String(cell===null||cell===undefined?'':cell);
+            if(!cnpj&&/CNPJ:/i.test(s))cnpj=extrairCnpj(s);
+            if(!mesano){var mm=s.match(/Per[ií]odo:\s*(\d{2})[-\/](\d{4})/i);if(mm)mesano=mm[1]+'/'+mm[2];}
+            var h=normHeader(s);
+            if(colPis<0&&/^(DEBITO|CREDITO) PIS$/.test(h))colPis=ci;
+            if(colCofins<0&&/^(DEBITO|CREDITO) COFINS$/.test(h))colCofins=ci;
+          });
+        });
+        if(!mesano){resolve({nome:file.name,erro:'Não encontrei o "Período" na planilha.'});return;}
+        if(colPis<0||colCofins<0){resolve({nome:file.name,erro:'Não encontrei as colunas de Débito/Crédito PIS e COFINS na planilha.'});return;}
+        var mm=parseInt(mesano.split('/')[0],10),yy=parseInt(mesano.split('/')[1],10);
+        var ld=new Date(yy,mm,0).getDate();
+        var dDisp=String(ld).padStart(2,'0')+'/'+String(mm).padStart(2,'0')+'/'+yy;
+        var lancamentos=[];
+        rows.forEach(function(row){
+          if(!row||row[1]===null||row[1]===undefined||row[1]==='')return;
+          var descNorm=normHeader(row[1]);
+          var base=detectarBasePisCofins(descNorm);if(!base)return;
+          var vPis=parseFloat(row[colPis]),vCofins=parseFloat(row[colCofins]);
+          if(!isNaN(vPis)&&vPis!==0)lancamentos.push({tipo:'pis_'+base,valor:vPis,dDisp:dDisp,ex:{mesano:mesano}});
+          if(!isNaN(vCofins)&&vCofins!==0)lancamentos.push({tipo:'cofins_'+base,valor:vCofins,dDisp:dDisp,ex:{mesano:mesano}});
+        });
+        var match=matchEmpresaByCnpj(cnpj);
+        resolve({nome:file.name,mesano:mesano,cnpj:cnpj,lancamentos:lancamentos,empresaKey:match?match.key:null,filial:match?match.fil:null});
+      }catch(err){resolve({nome:file.name,erro:err.message});}
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+function loadXlsxPC(fileList){
+  var files=Array.prototype.slice.call(fileList).filter(function(f){return/\.xlsx$|\.xls$/i.test(f.name);});
+  if(!files.length)return;
+  var dn=document.getElementById('drop-name-pc');if(dn){dn.style.display='block';dn.textContent='Lendo '+files.length+' planilha(s)...';}
+  Promise.all(files.map(readOneXlsxPC)).then(function(results){
+    results.forEach(function(r){r.id='p'+Date.now()+Math.random().toString(36).slice(2,7);arquivosPC.push(r);});
+    var d=document.getElementById('drop-pc');if(d)d.classList.add('done');
+    if(dn)dn.textContent=arquivosPC.length+' planilha(s) carregada(s)';
+    renderPreviewPC();
+  });
+}
+function setArquivoEmpresaPC(id,k){
+  var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.empresaKey=k||null;
+  var fs=k&&db.empresas[k]?getFiliais(db.empresas[k]):[];
+  a.filial=fs.length===1?fs[0].fil:null;
+  renderPreviewPC();
+}
+function setArquivoFilialPC(id,fil){
+  var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.filial=fil||null;renderPreviewPC();
+}
+function removerArquivoPC(id){arquivosPC=arquivosPC.filter(function(x){return x.id!==id;});renderPreviewPC();}
+function marcarDuplicadosPC(){
+  var vistos={};
+  arquivosPC.forEach(function(a){
+    if(a.erro||a.manualOnly){a.duplicado=false;return;}
+    var chave=normCnpj(a.cnpj)+'|'+(a.mesano||'');
+    if(chave==='|'){a.duplicado=false;return;}
+    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave].nome;a.duplicadoDeId=vistos[chave].id;}
+    else{a.duplicado=false;vistos[chave]=a;}
+  });
+}
+function getTiposPC(e){
+  var mapa=e.mapeamento||{},out=[];
+  PADRAO_PC.forEach(function(t){var m=mapa[t.key]||{},ativo=m.ativo!==undefined?m.ativo!==false:t.ativo;
+    out.push({key:t.key,label:m.label||t.label,hist:m.hist||t.hist,deb:m.deb||t.deb,cred:m.cred||t.cred,ativo:ativo});});
+  Object.keys(mapa).forEach(function(k){if(k.indexOf('pcextra_')===0){var m=mapa[k];out.push({key:k,label:m.label||k,hist:m.hist||'',deb:m.deb||'',cred:m.cred||'',ativo:m.ativo!==false});}});
+  return out;
+}
+function renderPreviewPC(){
+  marcarDuplicadosPC();atualizarLimpar('pc');
+  var prevEl=document.getElementById('prev-card-pc');
+  var novosEl=document.getElementById('novos-alert-pc');
+  var alertEl=document.getElementById('apur-alerts-pc');
+  var btn=document.getElementById('btn-gerar-pc');
+  if(novosEl)novosEl.innerHTML='';if(alertEl)alertEl.innerHTML='';
+  if(!arquivosPC.length){if(prevEl)prevEl.innerHTML='<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue as planilhas para identificar a empresa automaticamente pelo CNPJ.</div>';if(btn)btn.disabled=true;return;}
+  var empKeys=Object.keys(db.empresas);
+  var p={canEdit:ME.canEdit};
+  var novosGlobal={},totalLinhasGeraveis=0;
+  var html=arquivosPC.map(function(a){
+    if(a.erro){
+      return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><strong>'+esc(a.nome)+'</strong>'+
+        botoesArquivo('pc',a.id)+'</div>'+
+        '<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Erro ao ler planilha: '+esc(a.erro)+'</span></div></div>';
+    }
+    var e=a.empresaKey?db.empresas[a.empresaKey]:null;
+    var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+      '<div><strong>'+esc(a.nome)+'</strong><div style="font-size:11px;color:#888;margin-top:2px">'+(a.manualOnly?'Valores digitados':'CNPJ na planilha: '+esc(a.cnpj||'não encontrado'))+' &nbsp;·&nbsp; Competência: '+esc(a.mesano||'—')+'</div></div>'+
+      botoesArquivo('pc',a.id)+'</div>';
+    var empBlock;
+    var fsEmp=e?getFiliais(e):[];
+    if(e&&(a.filial||fsEmp.length<=1)){
+      var filUsada=a.filial||(fsEmp[0]&&fsEmp[0].fil)||'1';
+      empBlock='<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><i class="ti ti-check" style="color:#0AE18C"></i><span style="font-size:12px">Empresa identificada: <strong>'+esc(e.nome)+'</strong>'+(fsEmp.length>1?' — FIL <strong>'+esc(filUsada)+'</strong> ('+esc(filialLabel(filUsada))+')':'')+'</span>'+sisPill(e.sistema)+'</div>';
+    } else if(e&&fsEmp.length>1){
+      empBlock='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>"'+esc(e.nome)+'" tem '+fsEmp.length+' filiais cadastradas e o CNPJ desta planilha ('+esc(a.cnpj||'?')+') não bateu com nenhuma. Selecione a filial correta:</span></div>'+
+        '<select onchange="setArquivoFilialPC(\''+a.id+'\',this.value)" style="margin-top:4px">'+
+          '<option value="">— selecione a filial —</option>'+
+          fsEmp.map(function(f){return'<option value="'+esc(f.fil)+'">FIL '+esc(f.fil)+' ('+esc(filialLabel(f.fil))+') — '+esc(f.cnpj)+'</option>';}).join('')+
+        '</select>';
+    } else {
+      empBlock='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Não foi possível identificar a empresa pelo CNPJ. Selecione manualmente:</span></div>'+
+        '<select onchange="setArquivoEmpresaPC(\''+a.id+'\',this.value)" style="margin-top:4px">'+
+          '<option value="">— selecione a empresa —</option>'+
+          empKeys.map(function(k){var em=db.empresas[k],fk=getFiliais(em);return'<option value="'+k+'">'+esc(em.nome)+' ('+(fk.length>1?fk.length+' filiais':esc((fk[0]&&fk[0].cnpj)||em.cnpj||''))+')</option>';}).join('')+
+        '</select>';
+    }
+    var filialResolvida=e?(a.filial||(fsEmp.length===1?fsEmp[0].fil:null)):null;
+    var body='';
+    if(e&&a.duplicado){
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>Planilha duplicada — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'", já carregada. Estas linhas <strong>não</strong> serão geradas de novo.</span></div>'+botaoUsarEste('pc',a);
+    } else if(e&&!filialResolvida){
+      body='<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px">Selecione a filial acima para pré-visualizar os lançamentos.</div>';
+    } else if(e){
+      var tipos=getTiposPC(e);var tiposMap={};tipos.forEach(function(t){tiposMap[t.key]=t;});
+      var lancsPC=lancsComManuaisPC(a,e);
+      var tiposNoLanc={};lancsPC.forEach(function(l){tiposNoLanc[l.tipo]=true;});
+      var naoMapeados=Object.keys(tiposNoLanc).filter(function(k){return!tiposMap[k];});
+      naoMapeados.forEach(function(k){novosGlobal[k]=novosGlobal[k]||[];novosGlobal[k].push(a.empresaKey);});
+      var warns=[];tipos.forEach(function(t){if(tiposNoLanc[t.key]&&t.ativo&&(!t.deb||!t.cred))warns.push(t.label);});
+      if(warns.length&&alertEl)warns.forEach(function(w){alertEl.innerHTML+='<div class="alert alert-warn"><i class="ti ti-alert-triangle"></i><span>'+esc(e.nome)+' — conta em branco ou tipo inativo para: <strong>'+esc(w)+'</strong></span></div>';});
+      var win=e.sistema==='winthor';
+      var linhas=win?linhasWinFor(lancsPC,e,tipos,filialResolvida):linhasDomFor(lancsPC,e,tipos,filialResolvida);
+      totalLinhasGeraveis+=linhas.length;
+      if(!lancsPC.length){
+        body='<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px">'+(a.manualOnly?'Digite os valores abaixo.':'Nenhuma linha reconhecida (Vendas, Crédito Outorgado, etc.) nesta planilha.')+'</div>';
+      } else if(win){
+        body=tabelaWinthor(linhas,10);
+      } else {
+        body='<table class="preview-table" style="margin-top:8px"><tr><th>Data</th><th>Débito</th><th>Crédito</th><th>Valor</th><th>Histórico</th></tr>'+
+          linhas.slice(0,8).map(function(l){return'<tr><td>'+l.dDisp+'</td><td>'+l.deb+'</td><td>'+l.cred+'</td><td>'+l.val.toFixed(2).replace('.',',')+'</td><td>'+esc(l.hist.slice(0,50))+(l.hist.length>50?'…':'')+'</td></tr>';}).join('')+
+          (linhas.length>8?'<tr><td colspan="5" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-8)+' linhas</td></tr>':'')+'</table>';
+      }
+    }
+    if(e&&!a.duplicado&&filialResolvida)body+=blocoEditaveisPC(a,e)+blocoManuaisPC(a,e);
+    return '<div class="card">'+head+empBlock+body+'</div>';
+  }).join('');
+  if(prevEl)prevEl.innerHTML=html;
+  var novosKeys=Object.keys(novosGlobal);
+  if(novosKeys.length&&novosEl){
+    var nh='<div class="alert alert-info" style="flex-direction:column;align-items:flex-start;gap:8px">'+
+      '<div style="display:flex;align-items:center;gap:8px;font-weight:500"><i class="ti ti-sparkles"></i> Linhas não reconhecidas em alguma planilha</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">'+novosKeys.map(function(k){return'<code style="background:#fff;border:0.5px solid #90CAF9;border-radius:6px;padding:2px 10px;font-size:11px">'+esc(k)+'</code>';}).join('')+'</div>'+
+      '</div>';
+    novosEl.innerHTML=nh;
+  }
+  if(!novosKeys.length&&!(alertEl&&alertEl.innerHTML)&&alertEl)alertEl.innerHTML='<div class="alert alert-ok"><i class="ti ti-check"></i><span>Pronto para gerar — <strong>'+totalLinhasGeraveis+'</strong> linhas no total.</span></div>';
+  if(btn)btn.disabled=!totalLinhasGeraveis;
+}
+function gerarArquivoPC(){
+  marcarDuplicadosPC();
+  var mesano='';arquivosPC.forEach(function(a){if(!mesano&&a.mesano)mesano=a.mesano;});
+  var my=mesano?mesano.replace('/','_'):'export';
+  var domGroups={},winGrupos={},pendentes=0,duplicados=0;
+  arquivosPC.forEach(function(a){
+    if(a.erro)return;
+    if(a.duplicado){duplicados++;return;}
+    if(!a.empresaKey||!db.empresas[a.empresaKey]){pendentes++;return;}
+    var e=db.empresas[a.empresaKey],tipos=getTiposPC(e),fs=getFiliais(e);
+    var fil=a.filial||(fs.length===1?fs[0].fil:null);
+    if(!fil){pendentes++;return;}
+    if(e.sistema==='winthor'){winGrupos[a.empresaKey]=(winGrupos[a.empresaKey]||[]).concat(linhasWinFor(lancsComManuaisPC(a,e),e,tipos,fil));return;}
+    var linhas=linhasDomFor(lancsComManuaisPC(a,e),e,tipos,fil);
+    if(linhas.length)domGroups[a.empresaKey]=(domGroups[a.empresaKey]||[]).concat(linhas);
+  });
+  var gerou=0;
+  /* mesmo layout do ICMS (rotina 2127 do Winthor) */
+  gerou+=salvarWinthor('PISCOFINS','FEDERAIS',my,winGrupos);
+  Object.keys(domGroups).forEach(function(k){
+    var e=db.empresas[k],linhas=domGroups[k],codH=(e.mapeamento||{}).cod_h||'';
+    var txt=linhas.map(function(l){return[l.dDisp,l.deb,l.cred,l.val.toFixed(2).replace('.',','),codH,l.hist,'','','',''].join(';');}).join('\r\n');
+    dl(txt,'PISCOFINS_DOMINIO_'+e.cnpj.replace(/\D/g,'')+'_'+my+'.txt');gerou++;
+  });
+  var stEl=document.getElementById('apur-st-pc');
+  function stPC(m,t){if(stEl){stEl.textContent=m;stEl.className='status-msg'+(t?' '+t:'');}}
+  if(!gerou){stPC(pendentes?'Identifique a empresa/filial de todas as planilhas antes de gerar.':(duplicados?'Todas as planilhas carregadas são duplicadas.':'Nenhuma linha gerada — confira se os tipos estão ativos e com contas preenchidas.'),'err');return;}
+  stPC(gerou+' arquivo(s) gerado(s)'+(pendentes?' — '+pendentes+' planilha(s) sem empresa/filial identificada foram ignoradas.':'')+(duplicados?' — '+duplicados+' planilha(s) duplicada(s) foram ignoradas.':'.'),(pendentes||duplicados)?'warn':'ok');
+}
+
+
+/* ══════════════════ DEPRECIAÇÃO (Resumo da Depreciação Fiscal Domínio → Winthor) ══════════════════
+   Lê o PDF "Resumo da Depreciação Fiscal por Conta Patrimonial" da Domínio, pega a coluna
+   "Depreciação do mês" de cada grupo e gera, por grupo, 2 linhas C3 (D na conta de despesa,
+   C na conta do ativo) no layout contábil PC Sistemas — colunas A a L, só valores, sem cabeçalho.
+   O mapeamento grupo → contas fica no cadastro da empresa (mapeamento._depreciacao). */
+var DEPR_PADRAO={
+  '28810269000152':{cod_h:'1',filial:'7',grupos:[
+    {g:'2',nome:'COMPUTADORES E PERIFERICOS',d:'9954',c:'430',nd:'1',nc:'2'},
+    {g:'3',nome:'MAQUINAS E EQUIPAMENTOS',d:'9954',c:'441',nd:'1',nc:'2'},
+    {g:'4',nome:'MOVEIS E UTENSILIOS',d:'9954',c:'354',nd:'1',nc:'2'},
+    {g:'1',nome:'VEICULOS 25%',d:'9954',c:'428',nd:'1',nc:'2'},
+    {g:'5',nome:'TELEFONES E CELULARES',d:'9954',c:'9741',nd:'1',nc:'2'},
+    {g:'6',nome:'BENFEITORIA FILIAL AP',d:'9954',c:'1007',nd:'1',nc:'2'},
+    {g:'7',nome:'CONSTRUÇÃO MATRIZ',d:'9954',c:'341',nd:'1',nc:'2'},
+    {g:'9',nome:'GERADORES',d:'9954',c:'10133',nd:'3',nc:'4'}
+  ]}
+};
+var DEPR_HIST='REF A DEPRECIAÇÃO ACUMULADA DE {grupo} COMPET - {mesano}';
+var arquivosDP=[];
+
+function _clone(o){return JSON.parse(JSON.stringify(o));}
+function deprPadraoPorCnpjs(cnpjs){
+  for(var i=0;i<cnpjs.length;i++){var c=normCnpj(cnpjs[i]);if(DEPR_PADRAO[c])return _clone(DEPR_PADRAO[c]);}
+  return null;
+}
+/* Configuração de depreciação da empresa: a salva no cadastro; senão o padrão conhecido pelo CNPJ */
+function getDepr(e,cnpjPdf){
+  var m=e&&e.mapeamento&&e.mapeamento._depreciacao;
+  if(m&&m.grupos&&m.grupos.length)return m;
+  var cnpjs=[cnpjPdf||''];
+  if(e)getFiliais(e).forEach(function(f){cnpjs.push(f.cnpj);});
+  return deprPadraoPorCnpjs(cnpjs);
+}
+
+function paneDepreciacao(){
+  return '<div class="step-label">1 — PDFs do Resumo da Depreciação Fiscal (Domínio)</div><div class="divider"></div>'+
+  '<div class="card">'+
+    '<div class="drop" id="drop-dp" onclick="document.getElementById(\'pdf-dp-in\').click()">'+
+      '<i class="ti ti-building-warehouse" style="font-size:32px;color:#0AE18C;display:block;margin-bottom:6px"></i>'+
+      '<div class="drop-label">Clique ou arraste um ou mais <strong>PDFs do Resumo da Depreciação Fiscal por Conta Patrimonial</strong></div>'+
+      '<div class="drop-name" id="drop-name-dp"></div>'+
+    '</div>'+
+    '<input type="file" id="pdf-dp-in" accept=".pdf" multiple style="display:none">'+
+  '</div>'+
+  '<div id="apur-alerts-dp"></div>'+
+  cabecalhoPrevia('dp','2 — Empresas identificadas e prévia')+
+  '<div class="preview-wrap" id="prev-card-dp">'+
+    '<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar a empresa pelo CNPJ e montar os lançamentos de depreciação.</div>'+
+  '</div>'+
+  seletorFormato('dp')+
+  '<button class="btn btn-primary btn-full" id="btn-gerar-dp" disabled onclick="gerarArquivoDP()" style="margin-top:.25rem">'+
+    '<i class="ti ti-download"></i> Gerar arquivo(s) de importação Winthor</button>'+
+  '<div class="status-msg" id="apur-st-dp"></div>';
+}
+function setupDropDP(){
+  var drop=document.getElementById('drop-dp'),inp=document.getElementById('pdf-dp-in');
+  if(!drop||!inp||drop.getAttribute('data-ok'))return;
+  drop.setAttribute('data-ok','1');
+  ['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('over');});});
+  drop.addEventListener('dragleave',function(e){e.preventDefault();drop.classList.remove('over');});
+  drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('over');var fs=e.dataTransfer&&e.dataTransfer.files;if(fs&&fs.length)loadPdfsDP(fs);});
+  inp.addEventListener('change',function(){if(inp.files&&inp.files.length)loadPdfsDP(inp.files);inp.value='';});
+}
+
+/* Pura: linhas do PDF → {empresa,cnpj,ordem:[MM/AAAA],comp:{MM/AAAA:[{g,nome,dep}]}} */
+function parseResumoDepreciacao(lines){
+  var NUM='-?\\d{1,3}(?:\\.\\d{3})*,\\d{2}';
+  var ROW=new RegExp('^(\\d{1,4})\\s+(.+?)\\s+((?:'+NUM+'\\s*){3,})$');
+  var res={empresa:'',cnpj:'',ordem:[],comp:{}},cur=null;
+  function ensure(c){if(!res.comp[c]){res.comp[c]=[];res.ordem.push(c);}}
+  lines.forEach(function(raw,idx){
+    var l=String(raw).replace(/\s+/g,' ').replace(/(\d)\s+,(\d{2})\b/g,'$1,$2').trim();
+    if(!res.empresa&&l&&!/^P[áa]gina/i.test(l))res.empresa=l.replace(/\s*P[áa]gina:.*$/i,'').trim();
+    var cn=l.match(/C\.?N\.?P\.?J\.?:?\s*([\d.\/-]{14,18})/i);
+    if(cn&&!res.cnpj)res.cnpj=cn[1];
+    var m=l.match(/Compet[êe]ncia:?\s*\d{2}\/(\d{2})\/(\d{4})/i);
+    if(m){cur=m[1]+'/'+m[2];ensure(cur);return;}
+    m=l.match(/Compet[êe]ncia:?\s*(\d{2})\/(\d{4})/i);
+    if(m&&!cur){cur=m[1]+'/'+m[2];ensure(cur);return;}
+    var r=l.match(ROW);
+    if(r&&cur){
+      var nums=r[3].trim().split(/\s+/).map(function(s){var neg=s.charAt(0)==='-';var v=parseValorBR(s.replace(/^-/,''));return neg?-v:v;});
+      res.comp[cur].push({g:String(+r[1]),nome:r[2].trim(),dep:nums[2]});
+    }
+  });
+  res.ordem=res.ordem.filter(function(c){return res.comp[c].length;});
+  return res;
+}
+
+function readOnePdfDP(file){
+  return new Promise(function(resolve){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      pdfjsLib.getDocument({data:new Uint8Array(ev.target.result)}).promise.then(function(pdf){
+        var arr=[];for(var i=1;i<=pdf.numPages;i++)arr.push(pdf.getPage(i));
+        return Promise.all(arr).then(function(pl){return Promise.all(pl.map(function(p){return p.getTextContent();}));})
+        .then(function(cs){
+          var lines=[];cs.forEach(function(c){lines=lines.concat(linesFromContent(c));});
+          var p=parseResumoDepreciacao(lines);
+          if(!p.ordem.length){resolve([{nome:file.name,erro:'Não encontrei as linhas do Resumo da Depreciação Fiscal neste PDF. Confira se é o relatório "Resumo da Depreciação Fiscal por Conta Patrimonial" da Domínio, gerado com texto (não escaneado).'}]);return;}
+          var match=matchEmpresaByCnpj(p.cnpj);
+          resolve(p.ordem.map(function(c){
+            return{nome:file.name,cnpj:p.cnpj,empresaPdf:p.empresa,mesano:c,grupos:p.comp[c],multi:p.ordem.length,empresaKey:match?match.key:null,filial:match?match.fil:null};
+          }));
+        });
+      }).catch(function(err){resolve([{nome:file.name,erro:err.message}]);});
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+function loadPdfsDP(fileList){
+  var files=Array.prototype.slice.call(fileList).filter(function(f){return/\.pdf$/i.test(f.name);});
+  if(!files.length)return;
+  var dn=document.getElementById('drop-name-dp');if(dn){dn.style.display='block';dn.textContent='Lendo '+files.length+' PDF(s)...';}
+  Promise.all(files.map(readOnePdfDP)).then(function(results){
+    results.forEach(function(lista){lista.forEach(function(r){r.id='d'+Date.now()+Math.random().toString(36).slice(2,7);arquivosDP.push(r);});});
+    var d=document.getElementById('drop-dp');if(d)d.classList.add('done');
+    if(dn)dn.textContent=arquivosDP.length+' competência(s) carregada(s)';
+    renderPreviewDP();
+  });
+}
+function setArquivoEmpresaDP(id,k){
+  var a=arquivosDP.filter(function(x){return x.id===id;})[0];if(!a)return;
+  a.empresaKey=k||null;
+  var fs=k&&db.empresas[k]?getFiliais(db.empresas[k]):[];
+  a.filial=fs.length===1?fs[0].fil:null;
+  renderPreviewDP();
+}
+function setArquivoFilialDP(id,fil){var a=arquivosDP.filter(function(x){return x.id===id;})[0];if(!a)return;a.filial=fil||null;renderPreviewDP();}
+function removerArquivoDP(id){arquivosDP=arquivosDP.filter(function(x){return x.id!==id;});renderPreviewDP();}
+function marcarDuplicadosDP(){
+  var vistos={};
+  arquivosDP.forEach(function(a){
+    if(a.erro){a.duplicado=false;return;}
+    var chave=normCnpj(a.cnpj)+'|'+(a.mesano||'');
+    if(vistos[chave]){a.duplicado=true;a.duplicadoDeNome=vistos[chave].nome;a.duplicadoDeId=vistos[chave].id;}
+    else{a.duplicado=false;vistos[chave]=a;}
+  });
+}
+/* Resolve empresa/config/filial de um arquivo carregado */
+function ctxDP(a){
+  var e=a.empresaKey?db.empresas[a.empresaKey]:null;
+  var depr=getDepr(e,a.cnpj);
+  var fs=e?getFiliais(e):[];
+  var fil=e?(a.filial||(fs.length===1?fs[0].fil:null)):(depr?depr.filial:null);
+  return{e:e,depr:depr,fs:fs,fil:fil,nome:e?e.nome:(a.empresaPdf||'')};
+}
+function _numOuTexto(v){var s=String(v===undefined||v===null?'':v).trim();return/^\d+$/.test(s)?parseInt(s,10):s;}
+/* Monta as linhas Winthor (A–L) + avisos de um arquivo */
+function linhasDepr(a,depr,fil){
+  var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
+  var ld=new Date(yy,mm,0).getDate();
+  var dFmt=String(ld).padStart(2,'0')+String(mm).padStart(2,'0')+yy;
+  var codH=_numOuTexto(depr.cod_h||'1');
+  var rows=[],notes=[],usados={},porG={};
+  a.grupos.forEach(function(g){porG[g.g]=g;});
+  function nn(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,' ').trim();}
+  (depr.grupos||[]).forEach(function(c){
+    var g=porG[String(+c.g)];
+    if(!g){notes.push({k:'warn',t:'Grupo '+c.g+' ('+c.nome+') não aparece no PDF; ficou de fora.'});return;}
+    usados[g.g]=true;
+    if(nn(g.nome)!==nn(c.nome))notes.push({k:'warn',t:'Grupo '+c.g+': no PDF o nome é "'+g.nome+'" e no cadastro é "'+c.nome+'". Confira se é o mesmo grupo.'});
+    if(!c.d||!c.c){notes.push({k:'err',t:'Grupo '+c.g+' ('+c.nome+') está sem conta débito ou crédito no cadastro.'});return;}
+    if(!g.dep){notes.push({k:'warn',t:'Grupo '+c.g+' ('+c.nome+') com depreciação zero no mês; não gerei lançamento.'});return;}
+    var hist=DEPR_HIST.replace('{grupo}',c.nome).replace('{mesano}',a.mesano);
+    var vf=fvw(g.dep);
+    /* mesmo formato aceito pelo Winthor nos lançamentos de ICMS: DOC e coluna 11 vazios */
+    rows.push(['C3',_numOuTexto(c.nd||1),_numOuTexto(c.d),dFmt,'D',null,vf,codH,hist,'N',null,_numOuTexto(fil)]);
+    rows.push(['C3',_numOuTexto(c.nc||2),_numOuTexto(c.c),dFmt,'C',null,vf,codH,hist,'N',null,_numOuTexto(fil)]);
+  });
+  a.grupos.forEach(function(g){if(!usados[g.g])notes.push({k:'err',t:'Grupo '+g.g+' ('+g.nome+') está no PDF com R$ '+g.dep.toFixed(2).replace('.',',')+', mas não tem conta cadastrada. Inclua em Empresas → Mapeamento Depreciação.'});});
+  var totPdf=a.grupos.reduce(function(s,g){return s+(g.dep||0);},0);
+  var totD=rows.filter(function(r){return r[4]==='D';}).reduce(function(s,r){return s+parseFloat(r[6]);},0);
+  return{rows:rows,notes:notes,totPdf:totPdf,totD:totD};
+}
+function _fmtBR(v){return v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function renderPreviewDP(){
+  marcarDuplicadosDP();atualizarLimpar('dp');
+  var prevEl=document.getElementById('prev-card-dp'),alertEl=document.getElementById('apur-alerts-dp'),btn=document.getElementById('btn-gerar-dp');
+  if(alertEl)alertEl.innerHTML='';
+  if(!arquivosDP.length){if(prevEl)prevEl.innerHTML='<div class="card" style="font-size:12px;color:#888;font-style:italic">Carregue os PDFs para identificar a empresa pelo CNPJ e montar os lançamentos de depreciação.</div>';if(btn)btn.disabled=true;return;}
+  var empKeys=Object.keys(db.empresas),total=0,algumErro=false;
+  var html=arquivosDP.map(function(a){
+    var btnX=botoesArquivo('dp',a.id);
+    if(a.erro)return'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><strong>'+esc(a.nome)+'</strong>'+btnX+'</div><div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>'+esc(a.erro)+'</span></div></div>';
+    var x=ctxDP(a);
+    var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+      '<div><strong>'+esc(a.nome)+'</strong><div style="font-size:11px;color:#888;margin-top:2px">CNPJ no PDF: '+esc(a.cnpj||'não encontrado')+' &nbsp;·&nbsp; Competência: '+esc(a.mesano)+(a.multi>1?' &nbsp;·&nbsp; PDF com '+a.multi+' competências':'')+'</div></div>'+btnX+'</div>';
+    var empBlock;
+    if(x.e&&x.fs.length>1&&!a.filial){
+      empBlock='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>"'+esc(x.e.nome)+'" tem '+x.fs.length+' filiais. Selecione a filial:</span></div>'+
+        '<select onchange="setArquivoFilialDP(\''+a.id+'\',this.value)"><option value="">— selecione a filial —</option>'+
+        x.fs.map(function(f){return'<option value="'+esc(f.fil)+'">FIL '+esc(f.fil)+' — '+esc(f.cnpj)+'</option>';}).join('')+'</select>';
+    } else if(x.e){
+      empBlock='<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><i class="ti ti-check" style="color:#0AE18C"></i><span style="font-size:12px">Empresa identificada: <strong>'+esc(x.e.nome)+'</strong> — FIL <strong>'+esc(x.fil)+'</strong></span>'+sisPill('winthor')+'</div>';
+    } else if(x.depr){
+      empBlock='<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><i class="ti ti-check" style="color:#0AE18C"></i><span style="font-size:12px"><strong>'+esc(a.empresaPdf)+'</strong> — FIL <strong>'+esc(x.fil)+'</strong> (contas padrão de depreciação; empresa não cadastrada em Empresas)</span>'+sisPill('winthor')+'</div>';
+    } else {
+      empBlock='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>Não identifiquei a empresa pelo CNPJ ou ela não tem Mapeamento Depreciação. Selecione a empresa (o mapeamento é configurado em Empresas):</span></div>'+
+        '<select onchange="setArquivoEmpresaDP(\''+a.id+'\',this.value)" style="margin-top:4px"><option value="">— selecione a empresa —</option>'+
+        empKeys.map(function(k){return'<option value="'+k+'"'+(a.empresaKey===k?' selected':'')+'>'+esc(db.empresas[k].nome)+'</option>';}).join('')+'</select>';
+    }
+    var body='';
+    if(a.duplicado){
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-copy"></i><span>Duplicado — mesmo CNPJ e competência de "'+esc(a.duplicadoDeNome)+'". Estas linhas <strong>não</strong> serão geradas de novo.</span></div>'+botaoUsarEste('dp',a);
+    } else if(x.depr&&x.fil){
+      var L=linhasDepr(a,x.depr,x.fil);total+=L.rows.length;
+      var ok=Math.abs(L.totD-L.totPdf)<0.005;if(!ok)algumErro=true;
+      body='<div style="margin-top:8px">'+
+        '<div class="alert '+(ok?'alert-ok':'alert-err')+'"><i class="ti ti-'+(ok?'circle-check':'alert-circle')+'"></i><span>'+(ok?'Débitos = créditos = R$ '+_fmtBR(L.totD)+', igual à soma da depreciação do mês no PDF.':'Total lançado R$ '+_fmtBR(L.totD)+' difere da soma do PDF R$ '+_fmtBR(L.totPdf)+'. Veja os avisos.')+'</span></div>'+
+        L.notes.map(function(n){return'<div class="alert alert-'+n.k+'"><i class="ti ti-alert-triangle"></i><span>'+esc(n.t)+'</span></div>';}).join('')+
+        '<table class="preview-table"><tr><th>NÚM</th><th>COD RED</th><th>DATA</th><th>NAT</th><th>VALOR</th><th>HISTÓRICO</th><th>FIL</th></tr>'+
+        L.rows.map(function(r){return'<tr><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td><td>'+r[6]+'</td><td>'+esc(r[8])+'</td><td>'+r[11]+'</td></tr>';}).join('')+
+        '</table></div>';
+    } else if(x.e&&!x.depr){
+      body='<div class="alert alert-warn" style="margin-top:8px"><i class="ti ti-alert-triangle"></i><span>'+esc(x.e.nome)+' não tem Mapeamento Depreciação. Configure em Empresas → Editar.</span></div>';
+    }
+    return'<div class="card">'+head+empBlock+body+'</div>';
+  }).join('');
+  if(prevEl)prevEl.innerHTML=html;
+  if(alertEl&&total)alertEl.innerHTML='<div class="alert '+(algumErro?'alert-warn':'alert-ok')+'"><i class="ti ti-'+(algumErro?'alert-triangle':'check')+'"></i><span>'+(algumErro?'Há diferença entre o PDF e os lançamentos — confira antes de gerar. ':'Pronto para gerar — ')+'<strong>'+total+'</strong> linhas no total.</span></div>';
+  if(btn)btn.disabled=!total;
+}
+function gerarArquivoDP(){
+  marcarDuplicadosDP();
+  var gerou=0,pendentes=0,dup=0;
+  arquivosDP.forEach(function(a){
+    if(a.erro)return;
+    if(a.duplicado){dup++;return;}
+    var x=ctxDP(a);
+    if(!x.depr||!x.fil){pendentes++;return;}
+    var L=linhasDepr(a,x.depr,x.fil);if(!L.rows.length)return;
+    var my=a.mesano.replace('/','_');
+    if(formatoWin()==='txt'){saveFile('DEPRECIACAO_WINTHOR_'+normCnpj(a.cnpj)+'_'+my+'.txt',winRowsParaTxt(L.rows,txtCab(x.e)));gerou++;return;}
+    var ws=XLSX.utils.aoa_to_sheet(L.rows);
+    ws['!cols']=[{wch:5},{wch:8},{wch:11},{wch:10},{wch:10},{wch:5},{wch:24},{wch:7},{wch:70},{wch:11},{wch:3},{wch:7}];
+    var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'DEPRECIACAO');
+    saveXlsx(wb,'DEPRECIACAO_WINTHOR_'+normCnpj(a.cnpj)+'_'+my+'.xlsx');gerou++;
+  });
+  var el=document.getElementById('apur-st-dp');
+  function st(m,t){if(el){el.textContent=m;el.className='status-msg'+(t?' '+t:'');}}
+  if(!gerou){st(pendentes?'Identifique a empresa/filial de todos os PDFs antes de gerar.':(dup?'Todos os PDFs carregados são duplicados.':'Nenhuma linha gerada.'),'err');return;}
+  st(gerou+' arquivo(s) gerado(s)'+(pendentes?' — '+pendentes+' sem empresa/filial foram ignorados':'')+(dup?' — '+dup+' duplicado(s) ignorado(s)':'')+'.',(pendentes||dup)?'warn':'ok');
+}
+
+/* ── Cadastro: Mapeamento Depreciação (dentro do formulário de Empresas) ── */
+function deprRowHtml(g){
+  g=g||{};
+  function inp(cls,v,ph,w){return'<input type="text" class="'+cls+'" value="'+esc(v||'')+'" placeholder="'+ph+'" style="height:30px;font-size:12px;padding:0 6px;border:0.5px solid #D3D1C7;border-radius:6px;min-width:0'+(w?';width:'+w:'')+'">';}
+  return'<div class="dp-row" style="display:grid;grid-template-columns:48px minmax(120px,1fr) 70px 70px 44px 44px 30px;gap:6px;margin-bottom:6px;align-items:center">'+
+    inp('dp-g',g.g,'Grupo')+inp('dp-nome',g.nome,'Conta patrimonial')+inp('dp-d',g.d,'Débito')+inp('dp-c',g.c,'Crédito')+inp('dp-nd',g.nd||'1','Nº D')+inp('dp-nc',g.nc||'2','Nº C')+
+    '<button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px" onclick="this.parentElement.remove()"><i class="ti ti-x"></i></button></div>';
+}
+function addDeprRow(){var el=document.getElementById('ef-dp-list');if(!el)return;var d=document.createElement('div');d.innerHTML=deprRowHtml();el.appendChild(d.firstChild);}
+function carregarPadraoDepr(){
+  var cnpjs=[];document.querySelectorAll('#ef-filiais-list .ef-fil-cnpj').forEach(function(i){cnpjs.push(i.value);});
+  var p=deprPadraoPorCnpjs(cnpjs),st=document.getElementById('ef-dp-st');
+  if(!p){if(st){st.textContent='Não há padrão de depreciação para os CNPJs desta empresa.';st.className='status-msg err';}return;}
+  document.getElementById('ef-dp-list').innerHTML=p.grupos.map(deprRowHtml).join('');
+  document.getElementById('ef-dp-codh').value=p.cod_h;
+  if(st){st.textContent='Padrão carregado — revise e salve.';st.className='status-msg ok';}
+}
+function buildDeprForm(e){
+  var d=(e.mapeamento&&e.mapeamento._depreciacao)||null;
+  if(!d||!d.grupos||!d.grupos.length){var cs=e.nome?getFiliais(e).map(function(f){return f.cnpj;}):[];d=deprPadraoPorCnpjs(cs)||{cod_h:'1',grupos:[]};}
+  return'<div class="sep"></div><div class="section-title">Mapeamento Depreciação <span style="font-weight:300;color:#aaa;font-size:11px">(Resumo da Depreciação Fiscal da Domínio → Winthor — cada grupo gera D na conta de despesa e C na conta do ativo; a ordem abaixo é a ordem no arquivo)</span></div>'+
+    '<div class="field" style="max-width:200px"><label>Código de Histórico (depreciação)</label><input type="text" id="ef-dp-codh" value="'+esc(d.cod_h||'1')+'"></div>'+
+    '<div style="display:grid;grid-template-columns:48px minmax(120px,1fr) 70px 70px 44px 44px 30px;gap:6px;font-size:10px;color:#888;margin-bottom:4px"><span>Grupo</span><span>Conta patrimonial</span><span>Débito</span><span>Crédito</span><span>Nº D</span><span>Nº C</span><span></span></div>'+
+    '<div id="ef-dp-list">'+d.grupos.map(deprRowHtml).join('')+'</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="addDeprRow()"><i class="ti ti-plus"></i> Adicionar grupo</button>'+
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="carregarPadraoDepr()"><i class="ti ti-refresh"></i> Carregar padrão (planilha 4E)</button>'+
+    '</div><div class="status-msg" id="ef-dp-st"></div>';
+}
+function lerDeprForm(){
+  var grupos=[];
+  document.querySelectorAll('#ef-dp-list .dp-row').forEach(function(r){
+    function v(c){return((r.querySelector('.'+c)||{}).value||'').trim();}
+    if(!v('dp-g')&&!v('dp-d')&&!v('dp-c'))return;
+    grupos.push({g:v('dp-g'),nome:v('dp-nome').toUpperCase(),d:v('dp-d'),c:v('dp-c'),nd:v('dp-nd')||'1',nc:v('dp-nc')||'2'});
+  });
+  return{cod_h:((document.getElementById('ef-dp-codh')||{}).value||'1').trim(),grupos:grupos};
+}
+
+/* ══════════════════ EMPRESAS ══════════════════ */
+function paneEmpresas(){
+  var keys=Object.keys(db.empresas);
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'+
+    '<div class="step-label" style="margin-bottom:0">Empresas</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+
+      '<button class="btn btn-secondary btn-sm" onclick="verExclusoes()">Excluídas</button>'+
+      '<button class="btn btn-secondary btn-sm" onclick="exportarBackup()" title="Baixa um arquivo com todas as empresas e contas"><i class="ti ti-database-export"></i> Exportar backup</button>'+
+      '<label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Traz as empresas de um backup .json"><i class="ti ti-database-import"></i> Importar backup<input type="file" accept=".json" style="display:none" onchange="importarBackup(event)"></label>'+
+      '<button class="btn btn-primary btn-sm" onclick="showEmpForm(null)"><i class="ti ti-plus"></i> Nova empresa</button>'+
+    '</div></div><div class="status-msg" id="bk-st" style="text-align:right;margin:-.4rem 0 .6rem"></div>'+
+    '<div id="emp-list">'+(!keys.length?'<div class="alert alert-warn"><i class="ti ti-alert-triangle"></i><span>Nenhuma empresa cadastrada.</span></div>':keys.map(empItem).join(''))+'</div>'+
+    '<div id="emp-form"></div>';
+}
+/* ══════════════════ REGISTRO DE ALTERAÇÕES ══════════════════
+   Cada empresa guarda as últimas 50 alterações (quem, quando, o que mudou).
+   Exclusões ficam em auditoria/exclusoes (últimas 200). */
+function quemAgora(){return{login:ME.login||'',nome:ME.nome||ME.login||'Modo local',em:new Date().toISOString()};}
+function fmtDataHora(iso){
+  var d=new Date(iso);if(isNaN(d))return'';
+  function z(n){return String(n).padStart(2,'0');}
+  return z(d.getDate())+'/'+z(d.getMonth()+1)+'/'+d.getFullYear()+' '+z(d.getHours())+':'+z(d.getMinutes());
+}
+function diffEmpresa(a,b){
+  var out=[];if(!a)return out;
+  if((a.nome||'')!==(b.nome||''))out.push('Nome: "'+(a.nome||'')+'" → "'+(b.nome||'')+'"');
+  if((a.sistema||'')!==(b.sistema||''))out.push('Sistema: '+(a.sistema||'—')+' → '+(b.sistema||'—'));
+  var fa=getFiliais(a).map(function(f){return f.cnpj+' (FIL '+f.fil+')';}),fb=getFiliais(b).map(function(f){return f.cnpj+' (FIL '+f.fil+')';});
+  fb.forEach(function(f){if(fa.indexOf(f)<0)out.push('Filial incluída: '+f);});
+  fa.forEach(function(f){if(fb.indexOf(f)<0)out.push('Filial removida: '+f);});
+  var ma=a.mapeamento||{},mb=b.mapeamento||{};
+  if((ma.cod_h||'')!==(mb.cod_h||''))out.push('Código de histórico: '+(ma.cod_h||'—')+' → '+(mb.cod_h||'—'));
+  var keys={};Object.keys(ma).concat(Object.keys(mb)).forEach(function(k){if(k!=='cod_h')keys[k]=true;});
+  Object.keys(keys).forEach(function(k){
+    var x=ma[k],y=mb[k];
+    var rot=(y&&y.label)||(x&&x.label)||k;
+    if(x&&!y){out.push(rot+': removido');return;}
+    if(!x&&y){if(y.deb||y.cred)out.push(rot+': incluído (D '+(y.deb||'—')+' / C '+(y.cred||'—')+')');return;}
+    if((x.deb||'')!==(y.deb||''))out.push(rot+': débito '+(x.deb||'—')+' → '+(y.deb||'—'));
+    if((x.cred||'')!==(y.cred||''))out.push(rot+': crédito '+(x.cred||'—')+' → '+(y.cred||'—'));
+    if((x.hist||'')!==(y.hist||''))out.push(rot+': histórico alterado');
+    if((x.ativo!==false)!==(y.ativo!==false))out.push(rot+': '+(y.ativo!==false?'ativado':'desativado'));
+    if((x.label||'')!==(y.label||'')&&x.label&&y.label)out.push('Rótulo "'+x.label+'" → "'+y.label+'"');
+  });
+  return out;
+}
+function comRegistro(antes,novo,acao){
+  var q=quemAgora();
+  var mud=acao==='alterou'?diffEmpresa(antes,novo):[];
+  var hist=((antes&&antes.historico)||[]).slice();
+  hist.push({login:q.login,nome:q.nome,em:q.em,acao:acao,mudancas:mud.slice(0,40)});
+  novo.historico=hist.slice(-50);
+  novo.alterado={login:q.login,nome:q.nome,em:q.em};
+  return novo;
+}
+function verHistorico(k){
+  var e=db.empresas[k];if(!e)return;
+  var h=(e.historico||[]).slice().reverse();
+  var ACAO={criou:'Cadastrou',alterou:'Alterou',importou:'Importou do backup'};
+  openModal('<h3>Histórico — '+esc(e.nome)+'</h3>'+
+    '<p style="font-size:11px;color:#888;margin-bottom:10px">Últimas '+h.length+' alterações, da mais recente para a mais antiga.</p>'+
+    (h.length?h.map(function(r){
+      return '<div style="border-top:0.5px solid #EDEDED;padding:8px 0">'+
+        '<div style="font-size:12px"><strong>'+esc(r.nome||r.login||'—')+'</strong>'+(r.login?' <span style="color:#888">@'+esc(r.login)+'</span>':'')+
+        ' · '+esc(ACAO[r.acao]||r.acao)+' · <span style="color:#888;font-variant-numeric:tabular-nums">'+esc(fmtDataHora(r.em))+'</span></div>'+
+        (r.mudancas&&r.mudancas.length?'<ul style="font-size:11px;color:#5F5E5A;margin:4px 0 0 16px">'+r.mudancas.map(function(m){return'<li>'+esc(m)+'</li>';}).join('')+'</ul>'
+          :(r.acao==='alterou'?'<div style="font-size:11px;color:#888;margin-top:2px">Salvou sem mudar contas ou filiais.</div>':''))+
+      '</div>';
+    }).join(''):'<div style="font-size:12px;color:#888">Sem registros ainda. As alterações passam a ser registradas a partir de agora.</div>')+
+    '<div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">Fechar</button></div>');
+}
+function registrarExclusao(k,e){
+  return sb.from('exclusoes').insert({empresa_id:k,empresa:e.nome||k,cnpj:e.cnpj||''}).then(function(){});
+}
+function verExclusoes(){
+  sb.from('exclusoes').select('*').order('em',{ascending:false}).limit(200).then(function(r){
+    if(r.error){avisoGlobal('Não foi possível ler o registro agora.');return;}
+    var itens=r.data||[];
+    openModal('<h3>Empresas excluídas</h3>'+
+      (itens.length?itens.map(function(x){
+        return '<div style="border-top:0.5px solid #EDEDED;padding:8px 0;font-size:12px"><strong>'+esc(x.empresa)+'</strong> <span style="color:#888">'+esc(x.cnpj)+'</span>'+
+          '<div style="font-size:11px;color:#5F5E5A">Excluída por '+esc(x.por_nome||'—')+' em <span style="font-variant-numeric:tabular-nums">'+esc(fmtDataHora(x.em))+'</span></div></div>';
+      }).join(''):'<div style="font-size:12px;color:#888;margin-top:8px">Nenhuma empresa excluída.</div>')+
+      '<div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">Fechar</button></div>');
+  });
+}
+
+function empItem(k){
+  var e=db.empresas[k],ativos=getTipos(e).filter(function(t){return t.ativo;}).length,fs=getFiliais(e);
+  var filInfo=fs.length<=1
+    ?esc((fs[0]&&fs[0].cnpj)||e.cnpj||'')+(fs[0]&&fs[0].fil?' &nbsp;·&nbsp; FIL '+esc(fs[0].fil):'')
+    :fs.length+' filiais (FIL '+fs.map(function(f){return esc(f.fil);}).join(', ')+')';
+  return '<div class="emp-item">'+
+    '<div><div style="font-size:13px;font-weight:500">'+esc(e.nome)+'</div>'+
+    '<div style="font-size:11px;color:#888;margin-top:2px;display:flex;align-items:center;gap:6px">'+filInfo+' &nbsp;·&nbsp; '+sisPill(e.sistema)+' &nbsp;·&nbsp; <span>'+ativos+' tipos ativos</span></div>'+
+    (e.alterado?'<div style="font-size:11px;color:#5F5E5A;margin-top:2px">Última alteração: <strong>'+esc(e.alterado.nome||e.alterado.login)+'</strong> em <span style="font-variant-numeric:tabular-nums">'+esc(fmtDataHora(e.alterado.em))+'</span></div>':'<div style="font-size:11px;color:#aaa;margin-top:2px">Sem alterações registradas</div>')+
+    '</div>'+
+    '<div style="display:flex;gap:6px">'+
+      '<button class="btn btn-secondary btn-sm" onclick="showEmpForm(\''+k+'\')"><i class="ti ti-edit"></i> Editar</button>'+
+      '<button class="btn btn-secondary btn-sm" onclick="verHistorico(\''+k+'\')">Histórico</button>'+
+      '<button class="btn btn-secondary btn-sm" onclick="exportarParametrizacaoExcel(\''+k+'\')" title="Exportar parametrização Excel"><i class="ti ti-file-export"></i></button>'+
+      '<button class="btn btn-danger btn-sm" onclick="excEmp(\''+k+'\')"><i class="ti ti-trash"></i></button>'+
+    '</div></div>';
+}
+function refreshEmpList(){var el=document.getElementById('emp-list');if(!el)return;var keys=Object.keys(db.empresas);el.innerHTML=!keys.length?'<div class="alert alert-warn"><i class="ti ti-alert-triangle"></i><span>Nenhuma empresa.</span></div>':keys.map(empItem).join('');}
+function excEmp(k){
+  var e=db.empresas[k];if(!e)return;
+  openModal('<h3>Excluir empresa</h3><p style="font-size:13px;margin-top:8px">Excluir <strong>'+esc(e.nome)+'</strong> e todo o mapeamento de contas dela? '+'A exclusão vale para todos.'+'</p>'+
+    '<div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-danger" onclick="confirmarExcEmp(\''+esc(k)+'\')"><i class="ti ti-trash"></i> Excluir</button></div>');
+}
+function confirmarExcEmp(k){
+  closeModal();
+  var e=db.empresas[k]||{};
+  removerEmpresa(k).then(function(){return registrarExclusao(k,e);}).catch(function(err){avisoGlobal(msgErroBase(err));});
+}
+
+var _tidx=0,_fidx=0;
+function filialRowHtml(cnpj,fil,uf){
+  var idx=(_fidx++);
+  return '<div class="filial-row" data-idx="'+idx+'" style="display:flex;gap:8px;margin-bottom:6px;align-items:center">'+
+    '<input type="text" class="ef-fil-cnpj" value="'+esc(cnpj||'')+'" placeholder="00.000.000/0000-00" style="flex:1">'+
+    '<input type="text" class="ef-fil-fil" value="'+esc(fil||'')+'" placeholder="FIL" style="width:70px">'+
+    '<input type="text" class="ef-fil-uf" value="'+esc(uf||'')+'" placeholder="UF" maxlength="2" style="width:56px;text-transform:uppercase" title="UF da filial: usada em {filialnome} (MATRIZ / FILIAL TO) e {filialsigla} (MTZ / FL TO)">'+
+    '<button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()"><i class="ti ti-x"></i></button>'+
+  '</div>';
+}
+function addFilialRow(cnpj,fil,uf){
+  var el=document.getElementById('ef-filiais-list');if(!el)return;
+  var div=document.createElement('div');div.innerHTML=filialRowHtml(cnpj,fil,uf);el.appendChild(div.firstChild);
+}
+function addFiliaisEmLote(){
+  var ta=document.getElementById('ef-filiais-lote');if(!ta)return;
+  (ta.value||'').split('\n').forEach(function(linha){
+    var partes=linha.split(',');if(partes.length<2)return;
+    var cnpj=(partes[0]||'').trim(),fil=(partes[1]||'').trim(),uf=(partes[2]||'').trim().toUpperCase();
+    if(cnpj)addFilialRow(cnpj,fil,uf);
+  });
+  ta.value='';
+}
+function showEmpForm(k){
+  _tidx=0;_fidx=0;
+  var fa=document.getElementById('emp-form');if(!fa)return;
+  var e=k&&db.empresas[k]?db.empresas[k]:{nome:'',sistema:'dominio',mapeamento:{}};
+  var sis=e.sistema||'dominio';
+  var fs=k?getFiliais(e):[];
+  fa.innerHTML='<div class="sep"></div>'+
+    '<div class="step-label">'+(k?'Editar empresa':'Nova empresa')+'</div><div class="divider"></div>'+
+    '<div class="card">'+
+      '<div class="field"><label>Nome / Razão social</label><input type="text" id="ef-nome" value="'+esc(e.nome||'')+'"></div>'+
+      '<div class="field"><label>Filiais (CNPJ + código FIL usado no Domínio/Winthor) <span style="font-weight:300;color:#aaa;font-size:11px">— uma linha por filial; empresas com uma filial só, use uma linha</span></label>'+
+        '<div id="ef-filiais-list">'+(fs.length?fs.map(function(f){return filialRowHtml(f.cnpj,f.fil,f.uf);}).join(''):filialRowHtml('',''))+'</div>'+
+        '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="addFilialRow()"><i class="ti ti-plus"></i> Adicionar filial</button>'+
+      '</div>'+
+      '<div class="field"><label style="font-weight:300;color:#aaa;font-size:11px">Colar várias de uma vez (uma por linha: CNPJ, FIL, UF)</label>'+
+        '<textarea id="ef-filiais-lote" rows="2" placeholder="35.397.417/0001-14, 1&#10;35.397.417/0002-95, 3" style="font-size:11px"></textarea>'+
+        '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="addFiliaisEmLote()"><i class="ti ti-corner-down-left"></i> Adicionar da lista acima</button>'+
+      '</div>'+
+      '<div class="field"><label>Sistema de importação</label>'+
+        '<select id="ef-sis" onchange="onSisChange(\''+esc(k||'')+'\')">'+
+          '<option value="dominio" '+(sis==='dominio'?'selected':'')+'>Domínio — gera TXT</option>'+
+          '<option value="winthor" '+(sis==='winthor'?'selected':'')+'>Winthor — gera XLSX</option>'+
+        '</select></div>'+
+      '<div class="sep"></div><div class="section-title">Mapeamento de contas e históricos <span style="font-weight:300;color:#aaa;font-size:11px">(vale para todas as filiais acima — use {filiallabel} no histórico p/ diferenciar MTZ/FL 003/etc.)</span></div>'+
+      '<div class="field"><label style="font-weight:300;color:#aaa;font-size:11px">Importar parametrização de uma planilha Excel já pronta (aba ESTADUAIS, formato Winthor) <span style="font-weight:300;color:#aaa;font-size:11px">— preenche/atualiza os tipos abaixo automaticamente; nada é apagado, você revisa antes de salvar</span></label>'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+          '<label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0"><i class="ti ti-file-spreadsheet"></i> Importar parametrização Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importarParametrizacaoExcel(event)"></label>'+
+        '</div>'+
+        '<div class="status-msg" id="ef-import-st"></div>'+
+        '<div id="ef-import-resumo"></div>'+
+      '</div>'+
+      '<div id="ef-codh">'+buildCodH(e.mapeamento||{})+'</div>'+
+      '<div id="ef-mapa">'+buildMapaDom(e.mapeamento||{})+'</div>'+
+      '<div class="sep"></div><div class="section-title">Lançamentos com valor manual <span style="font-weight:300;color:#aaa;font-size:11px">(ex.: diferenças — contas e histórico fixos aqui; o valor é digitado na aba Apuração, em cada PDF)</span></div>'+
+      '<div id="ef-mapa-man">'+buildMapaManual(e.mapeamento||{})+'</div>'+
+      '<div class="sep"></div><div class="section-title">Mapeamento PIS/COFINS <span style="font-weight:300;color:#aaa;font-size:11px">(1 lançamento por linha do Resumo de Apuração, separando PIS e COFINS — {mesano} vira o mês/ano do arquivo, ex.: 07/2026)</span></div>'+
+      '<div id="ef-mapa-pc">'+buildMapaPC(e.mapeamento||{})+'</div>'+
+      buildDeprForm(e)+
+      '<div style="display:flex;gap:8px;margin-top:1rem">'+
+        '<button class="btn btn-primary" onclick="salvarEmp(\''+esc(k||'')+'\')"><i class="ti ti-check"></i> Salvar</button>'+
+        '<button class="btn btn-secondary" onclick="document.getElementById(\'emp-form\').innerHTML=\'\'"><i class="ti ti-x"></i> Cancelar</button>'+
+      '</div><div class="status-msg" id="ef-st"></div></div>';
+  fa.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function onSisChange(k){
+  var sis=(document.getElementById('ef-sis')||{}).value||'dominio';
+  var mapa={};if(k&&db.empresas[k])mapa=db.empresas[k].mapeamento||{};
+  var elh=document.getElementById('ef-codh');if(elh)elh.innerHTML=buildCodH(mapa);
+  var el=document.getElementById('ef-mapa');if(el)el.innerHTML=buildMapaDom(mapa);
+}
+function tipoCard(key,label,hist,deb,cred,ativo){
+  var id='tc'+(++_tidx);
+  var padrao=null;PADRAO.forEach(function(t){if(t.key===key)padrao=t;});
+  if(!padrao)PADRAO_PC.forEach(function(t){if(t.key===key)padrao=t;});
+  return '<div class="tipo-card" id="tcard-'+id+'" data-key="'+esc(key)+'">'+
+    '<div class="tipo-header" onclick="toggleTipo(\''+id+'\')">'+
+      '<div><div class="tipo-label">'+esc(label)+'</div>'+
+      '<div class="tipo-contas" id="tc-contas-'+id+'">D: '+(deb||'—')+' / C: '+(cred||'—')+'</div></div>'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<label class="chk-label" onclick="event.stopPropagation()"><input type="checkbox" id="tc-ativo-'+id+'" '+(ativo?'checked':'')+' style="accent-color:#0AE18C"> Ativo</label>'+
+        '<i class="ti ti-chevron-down" style="color:#888;font-size:13px"></i>'+
+      '</div></div>'+
+    '<div class="tipo-body" id="tc-body-'+id+'">'+
+      (padrao?'<button class="btn btn-secondary btn-sm" style="margin-bottom:8px" onclick="event.stopPropagation();usarPadrao(\''+id+'\')"><i class="ti ti-refresh"></i> Usar padrão (conta confirmada c/ Winthor real)</button>':'')+
+      '<div class="field"><label>Rótulo</label><input type="text" id="tc-lbl-'+id+'" value="'+esc(label)+'" onchange="updateContas(\''+id+'\')"></div>'+
+      '<div class="field"><label>Histórico completo <span style="font-weight:300;color:#aaa;font-size:11px">(use {nota}, {mesano}, {filiallabel} (MTZ / FL 003), {filialnome} (MATRIZ / FILIAL TO) ou {filialsigla} (MTZ / FL TO))</span></label>'+
+        '<textarea id="tc-hist-'+id+'" rows="3">'+esc(hist)+'</textarea></div>'+
+      '<div class="grid2">'+
+        '<div class="field"><label>Conta Débito <span style="font-weight:300;color:#aaa;font-size:11px">(cód. reduzido — Winthor: coluna CODIGO RED da linha D)</span></label><input type="text" id="tc-deb-'+id+'" value="'+esc(deb||'')+'" onchange="updateContas(\''+id+'\')"></div>'+
+        '<div class="field"><label>Conta Crédito <span style="font-weight:300;color:#aaa;font-size:11px">(cód. reduzido — Winthor: coluna CODIGO RED da linha C)</span></label><input type="text" id="tc-cred-'+id+'" value="'+esc(cred||'')+'" onchange="updateContas(\''+id+'\')"></div>'+
+      '</div></div></div>';
+}
+function usarPadrao(id){
+  var card=document.getElementById('tcard-'+id);if(!card)return;
+  var key=card.getAttribute('data-key');var padrao=null;PADRAO.forEach(function(t){if(t.key===key)padrao=t;});
+  if(!padrao)PADRAO_PC.forEach(function(t){if(t.key===key)padrao=t;});
+  if(!padrao)return;
+  document.getElementById('tc-lbl-'+id).value=padrao.label;
+  document.getElementById('tc-hist-'+id).value=padrao.hist;
+  document.getElementById('tc-deb-'+id).value=padrao.deb;
+  document.getElementById('tc-cred-'+id).value=padrao.cred;
+  updateContas(id);
+}
+function toggleTipo(id){var b=document.getElementById('tc-body-'+id);if(b)b.classList.toggle('open');updateContas(id);}
+function updateContas(id){
+  var d=(document.getElementById('tc-deb-'+id)||{}).value||'—';
+  var c=(document.getElementById('tc-cred-'+id)||{}).value||'—';
+  var el=document.getElementById('tc-contas-'+id);if(el)el.textContent='D: '+d+' / C: '+c;
+}
+/* Tipo extra de ICMS = qualquer chave do mapeamento que não seja padrão, manual, PIS/COFINS ou configuração */
+function ehExtraIcms(k,v){
+  if(!v||typeof v!=='object'||Array.isArray(v))return false;
+  if(k.charAt(0)==='_'||k==='cod_h'||PKEYS.indexOf(k)>-1||PCKEYS.indexOf(k)>-1)return false;
+  return k.indexOf('manual_')!==0&&k.indexOf('pcextra_')!==0;
+}
+function buildMapaDom(mapa){
+  _tidx=0;var html='<div id="tipos-lista">';
+  PADRAO.forEach(function(t){var m=mapa[t.key]||{};html+=tipoCard(t.key,m.label||t.label,m.hist||t.hist,m.deb||t.deb,m.cred||t.cred,m.ativo!==false);});
+  Object.keys(mapa).forEach(function(k){if(ehExtraIcms(k,mapa[k])){var m=mapa[k];html+=tipoCard(k,m.label||k,m.hist||'',m.deb||'',m.cred||'',m.ativo!==false);}});
+  return html+'</div><button class="btn btn-secondary btn-sm" style="margin-top:.5rem" onclick="addTipoExtra()"><i class="ti ti-plus"></i> Adicionar tipo extra</button>';
+}
+function addTipoExtra(){var l=document.getElementById('tipos-lista');if(!l)return;var div=document.createElement('div');div.innerHTML=tipoCard('extra_'+Date.now(),'Novo tipo','','','',true);l.appendChild(div.firstChild);}
+
+function buildMapaManual(mapa){
+  var html='<div id="tipos-lista-man">';
+  Object.keys(mapa).forEach(function(k){if(k.indexOf('manual_')===0){var m=mapa[k];html+=tipoCard(k,m.label||k,m.hist||'',m.deb||'',m.cred||'',m.ativo!==false);}});
+  return html+'</div><button class="btn btn-secondary btn-sm" style="margin-top:.5rem" onclick="addTipoManual()"><i class="ti ti-plus"></i> Adicionar lançamento manual</button>';
+}
+function addTipoManual(){var l=document.getElementById('tipos-lista-man');if(!l)return;var div=document.createElement('div');div.innerHTML=tipoCard('manual_'+Date.now(),'Diferença','DIFERENÇA ICMS {filiallabel} - COMPT. {mesano}','','',true);l.appendChild(div.firstChild);var c=l.lastChild;if(c){var b=c.querySelector('.tipo-body');if(b)b.classList.add('open');}}
+
+function buildMapaPC(mapa){
+  var html='<div id="tipos-lista-pc">';
+  PADRAO_PC.forEach(function(t){var m=mapa[t.key]||{};html+=tipoCard(t.key,m.label||t.label,m.hist||t.hist,m.deb||t.deb,m.cred||t.cred,m.ativo!==false&&(m.ativo!==undefined?m.ativo:t.ativo));});
+  Object.keys(mapa).forEach(function(k){if(k.indexOf('pcextra_')===0){var m=mapa[k];html+=tipoCard(k,m.label||k,m.hist||'',m.deb||'',m.cred||'',m.ativo!==false);}});
+  return html+'</div><button class="btn btn-secondary btn-sm" style="margin-top:.5rem" onclick="addTipoExtraPC()"><i class="ti ti-plus"></i> Adicionar tipo extra</button>';
+}
+function addTipoExtraPC(){var l=document.getElementById('tipos-lista-pc');if(!l)return;var div=document.createElement('div');div.innerHTML=tipoCard('pcextra_'+Date.now(),'Novo tipo','','','',true);l.appendChild(div.firstChild);}
+function buildCodH(mapa){
+  return '<div class="grid2" style="max-width:460px"><div class="field"><label for="wt-codh">Código de Histórico</label><input type="text" id="wt-codh" value="'+esc(mapa.cod_h||'')+'" placeholder="ex: 24"></div>'+
+    '<div class="field"><label for="wt-txtcab">Cabeçalho do TXT Winthor <span style="font-weight:300;color:#aaa;font-size:11px">(1ª linha)</span></label><input type="text" id="wt-txtcab" maxlength="14" value="'+esc(mapa.txt_cab||'')+'" placeholder="'+TXT_CAB_PADRAO+'"></div></div>'+
+    '<div class="alert alert-info" style="margin-bottom:8px"><i class="ti ti-info-circle"></i><span>Mesmo código de histórico usado em todos os lançamentos desta empresa (Domínio ou Winthor). As contas débito/crédito de cada tipo de lançamento são configuradas abaixo, por tipo.</span></div>';
+}
+function salvarEmp(k){
+  var nome=(document.getElementById('ef-nome').value||'').trim();
+  var sis=(document.getElementById('ef-sis')||{}).value||'dominio';
+  var st=document.getElementById('ef-st');
+  var filiais=[];
+  document.querySelectorAll('#ef-filiais-list .filial-row').forEach(function(row){
+    var cnpjV=((row.querySelector('.ef-fil-cnpj')||{}).value||'').trim();
+    var filV=((row.querySelector('.ef-fil-fil')||{}).value||'').trim();
+    var ufV=((row.querySelector('.ef-fil-uf')||{}).value||'').trim().toUpperCase();
+    if(cnpjV)filiais.push(ufV?{cnpj:cnpjV,fil:filV||'1',uf:ufV}:{cnpj:cnpjV,fil:filV||'1'});
+  });
+  if(!nome||!filiais.length){st.textContent='Preencha o nome e ao menos uma filial (CNPJ).';st.className='status-msg err';return;}
+  var cnpjsNorm=filiais.map(function(f){return normCnpj(f.cnpj);});
+  var repetido=cnpjsNorm.some(function(c,i){return c&&cnpjsNorm.indexOf(c)!==i;});
+  if(repetido){st.textContent='Há CNPJs repetidos na lista de filiais.';st.className='status-msg err';return;}
+  var mapa={};
+  document.querySelectorAll('#tipos-lista .tipo-card').forEach(function(card){
+    var key=card.getAttribute('data-key');if(!key)return;
+    var id=card.id.replace('tcard-','');
+    mapa[key]={label:(document.getElementById('tc-lbl-'+id)||{}).value||key,hist:(document.getElementById('tc-hist-'+id)||{}).value||'',deb:(document.getElementById('tc-deb-'+id)||{}).value||'',cred:(document.getElementById('tc-cred-'+id)||{}).value||'',ativo:!!(document.getElementById('tc-ativo-'+id)||{}).checked};
+  });
+  document.querySelectorAll('#tipos-lista-man .tipo-card').forEach(function(card){
+    var key=card.getAttribute('data-key');if(!key)return;
+    var id=card.id.replace('tcard-','');
+    mapa[key]={label:(document.getElementById('tc-lbl-'+id)||{}).value||key,hist:(document.getElementById('tc-hist-'+id)||{}).value||'',deb:(document.getElementById('tc-deb-'+id)||{}).value||'',cred:(document.getElementById('tc-cred-'+id)||{}).value||'',ativo:!!(document.getElementById('tc-ativo-'+id)||{}).checked};
+  });
+  document.querySelectorAll('#tipos-lista-pc .tipo-card').forEach(function(card){
+    var key=card.getAttribute('data-key');if(!key)return;
+    var id=card.id.replace('tcard-','');
+    mapa[key]={label:(document.getElementById('tc-lbl-'+id)||{}).value||key,hist:(document.getElementById('tc-hist-'+id)||{}).value||'',deb:(document.getElementById('tc-deb-'+id)||{}).value||'',cred:(document.getElementById('tc-cred-'+id)||{}).value||'',ativo:!!(document.getElementById('tc-ativo-'+id)||{}).checked};
+  });
+  mapa.cod_h=(document.getElementById('wt-codh')||{}).value||'';
+  var txtCabV=((document.getElementById('wt-txtcab')||{}).value||'').trim();if(txtCabV)mapa.txt_cab=txtCabV;
+  /* mantém configurações que não aparecem como cards (ex.: _estrutura) */
+  var mapaAntes=(k&&db.empresas[k]&&db.empresas[k].mapeamento)||{};
+  Object.keys(mapaAntes).forEach(function(x){if(x.charAt(0)==='_'&&!(x in mapa))mapa[x]=mapaAntes[x];});
+  mapa._depreciacao=lerDeprForm();
+  var id=k||docId(normCnpj(filiais[0].cnpj)||'emp_'+Date.now());
+  st.textContent='Salvando…';st.className='status-msg';
+  var antes=db.empresas[id];
+  persistEmpresa(id,comRegistro(antes,{nome:nome,cnpj:filiais[0].cnpj,filial:filiais[0].fil,filiais:filiais,sistema:sis,mapeamento:mapa},antes?'alterou':'criou')).then(function(){
+    st.textContent='Empresa salva.';st.className='status-msg ok';
+    setTimeout(function(){var f=document.getElementById('emp-form');if(f)f.innerHTML='';},700);
+  }).catch(function(err){st.textContent=msgErroBase(err);st.className='status-msg err';});
+}
+
+boot();
+</script>
+</body>
+</html>
+
