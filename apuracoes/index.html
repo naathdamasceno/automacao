@@ -980,9 +980,15 @@ function filialPlaceholders(e,fil){
   return{filiallabel:lbl,filialnome:uf?'FILIAL '+uf:lbl,filialsigla:uf?'FL '+uf:lbl};
 }
 /* Lançamento de diferença: histórico sempre "DIFERENÇA " + descrição (se a regra já não começar assim) */
-function histDifPC(h,l){
-  if(!l||!l.diferenca)return h;
-  return /^DIFEREN/.test(normHeader(h))?h:'DIFERENÇA '+h;
+function histDifPC(h,l,t){
+  if(!l||!l.diferenca||!t)return h;
+  return'DIFERENÇA '+descRegraPC(t)+' '+(impostoDaRegra(t)||'').toUpperCase();
+}
+/* Descrição da regra sem o imposto, sem "Diferença"/"ref." e sem o "(contrapartida ...)" */
+function descRegraPC(t){
+  var d=String(t.label||'').replace(/^\s*(PIS|COFINS)\s*[—–\-:]\s*/i,'').replace(/\([^)]*contrapartida[^)]*\)/ig,'')
+    .replace(/^\s*diferen[çc]a\s*/i,'').replace(/^(ref\.?|referente)\s*/i,'').replace(/^(a|de|do|da|s\/)\s+/i,'').replace(/\s+/g,' ').trim();
+  return d.toUpperCase();
 }
 function resolveHist(tpl,ex){
   var h=String(tpl||'');
@@ -1237,7 +1243,10 @@ function setManualPC(id,key,val){
   var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a)return;
   a.manuais=a.manuais||{};
   var v=parseValorManual(val);
-  if(isNaN(v)||v===0)delete a.manuais[key];else a.manuais[key]=v;
+  /* valor fica sempre positivo; se digitar negativo, só inverte as contas desta linha */
+  a.invertidos=a.invertidos||{};
+  if(isNaN(v)||v===0){delete a.manuais[key];delete a.invertidos[key];}
+  else{a.manuais[key]=Math.abs(v);if(v<0)a.invertidos[key]=true;}
   renderPreviewPC();
 }
 /* Valores lidos da planilha que o usuário corrigiu na prévia (Winthor: 4E, Safra...).
@@ -1302,7 +1311,7 @@ function lancsComManuaisPC(a,e){
     var k=t.key,v=a.manuais[k];if(v===undefined||isNaN(v)||!v)return;
     /* é diferença: regra de Diferença, valor vindo das colunas L/M, ou valor digitado diferente do da planilha */
     var pre=(a.preenchidos||{})[k],dif=/DIFERENCA/.test(normHeader(t.label))||!!(a.difKeys&&a.difKeys[k])||(!!a.memoria&&pre!==v);
-    out.push({tipo:k,valor:Math.abs(v),inverter:efetivoPC(e,t,v).inv,diferenca:dif,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
+    out.push({tipo:k,valor:Math.abs(v),inverter:efetivoPC(e,t,v,a).inv,diferenca:dif,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
   });
   return out;
 }
@@ -1319,8 +1328,8 @@ function viraAutoPC(e,t){
   return false;
 }
 function viraManualPC(e,t){return!!(((e.mapeamento||{})._inverter_pc||{})[t.key]);}
-function efetivoPC(e,t,v){
-  var inv=(v<0)!==viraAutoPC(e,t)!==viraManualPC(e,t);
+function efetivoPC(e,t,v,a){
+  var inv=(v<0)!==viraAutoPC(e,t)!==viraManualPC(e,t)!==!!(a&&a.invertidos&&a.invertidos[t.key]);
   return{inv:inv,deb:inv?t.cred:t.deb,cred:inv?t.deb:t.cred};
 }
 function inverterRegraPC(k,key){
@@ -1365,7 +1374,7 @@ function blocoManuaisPC(a,e){
     '<summary style="font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-pencil"></i> Valores digitados — '+ts.length+(win?' regras':' tipos')+' de PIS/COFINS desta empresa</summary><div style="margin-top:8px">'+
     ts.map(function(t){
       var v=a.manuais[t.key],falta=!t.deb||!t.cred,lidos=lidosPorTipo[t.key],pre=(a.preenchidos||{})[t.key];
-      var ef=efetivoPC(e,t,v||0),man=viraManualPC(e,t),trocou=ef.deb!==t.deb;
+      var ef=efetivoPC(e,t,v||0,a),man=viraManualPC(e,t),trocou=ef.deb!==t.deb;
       return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
         '<div style="flex:1;min-width:180px;font-size:12px">'+esc(t.label)+
           '<div class="tipo-contas">D: '+esc(ef.deb||'—')+' / C: '+esc(ef.cred||'—')+(trocou?' <span style="color:#B26A00">(invertido)</span>':'')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+
@@ -1377,7 +1386,7 @@ function blocoManuaisPC(a,e){
         (win?'<button type="button" class="btn btn-secondary btn-sm" title="Trocar Débito e Crédito desta regra (fica gravado na empresa)" aria-label="Inverter contas de '+esc(t.label)+'" onclick="inverterRegraPC(\''+esc(a.empresaKey)+'\',\''+esc(t.key)+'\')" style="height:32px'+(man?';background:#FFF1D6;border-color:#EF9F27':'')+'"><i class="ti ti-arrows-exchange"></i></button>':'')+
       '</div>';
     }).join('')+
-    '<div style="font-size:10px;color:#888">Deixe em branco ou 0 para não lançar. Valor negativo inverte Débito e Crédito.'+(win?' Diferenças: nos débitos o imposto a recolher fica a crédito e nos créditos o imposto a recuperar fica a débito (conforme a regra "Aproveitamento de crédito"). O botão <i class="ti ti-arrows-exchange"></i> troca D/C da regra e fica gravado na empresa.':'')+'</div>'+
+    '<div style="font-size:10px;color:#888">Deixe em branco ou 0 para não lançar. O valor é sempre positivo: se a diferença for negativa, as contas são invertidas.'+(win?' Diferenças: nos débitos o imposto a recolher fica a crédito e nos créditos o imposto a recuperar fica a débito (conforme a regra "Aproveitamento de crédito"). O botão <i class="ti ti-arrows-exchange"></i> troca D/C da regra e fica gravado na empresa.':'')+'</div>'+
   '</div></details>';
 }
 function tabelaWinthor(linhas,max){
@@ -1510,7 +1519,7 @@ function linhasDomFor(lancs,e,tipos,filOverride){
   lancs.forEach(function(l){
     var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
     var ex2=Object.assign({},l.ex,filialPlaceholders(e,fil));
-    out.push({dDisp:l.dDisp,dFmt:l.dFmt,deb:l.inverter?t.cred:t.deb,cred:l.inverter?t.deb:t.cred,val:l.valor,lote:lote,hist:histDifPC(resolveHist(t.hist,ex2),l)});lote++;
+    out.push({dDisp:l.dDisp,dFmt:l.dFmt,deb:l.inverter?t.cred:t.deb,cred:l.inverter?t.deb:t.cred,val:l.valor,lote:lote,hist:histDifPC(resolveHist(t.hist,ex2),l,t)});lote++;
   });
   return out;
 }
@@ -1526,7 +1535,7 @@ function linhasWinFor(lancs,e,tipos,filOverride){
   lancs.forEach(function(l){
     var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
     var ex2=Object.assign({},l.ex,filialPlaceholders(e,fil));
-    var vf=fvw(l.valor),hist=histDifPC(resolveHist(t.hist,ex2),l);
+    var vf=fvw(l.valor),hist=histDifPC(resolveHist(t.hist,ex2),l,t);
     /* layout aceito pelo Winthor (conferido com importação real): data DDMMAAAA em texto,
        conta/cod. histórico/filial/doc como número, DOC vazio quando não há nota, coluna 11 vazia */
     var dWin=String(l.dDisp||'').replace(/\//g,'');
@@ -1738,9 +1747,12 @@ function aplicarMemoriaPC(a,e,ek,forcar){
       if(k)soma(k,p[1]);else semRegra.push({desc:l.desc,imp:imp.toUpperCase(),valor:p[1]});
     });
   });
+  var invs={};
+  Object.keys(manuais).forEach(function(k){if(manuais[k]<0){invs[k]=true;manuais[k]=Math.abs(manuais[k]);pre[k]=manuais[k];}});
   if(forcar&&a.manuais&&a.preenchidos){ /* preserva edições manuais */
-    Object.keys(a.manuais).forEach(function(k){if(a.manuais[k]!==a.preenchidos[k])manuais[k]=a.manuais[k];});
+    Object.keys(a.manuais).forEach(function(k){if(a.manuais[k]!==a.preenchidos[k]){manuais[k]=a.manuais[k];invs[k]=!!(a.invertidos&&a.invertidos[k]);}});
   }
+  a.invertidos=invs;
   a.manuais=manuais;a.preenchidos=pre;a.memoriaSemRegra=semRegra;a.memoriaDifs=difs;a.difKeys=difKeys;a.memoriaAplicada=ek;
 }
 /* Troca a regra de uma diferença e grava a escolha na empresa (vale para os próximos meses) */
