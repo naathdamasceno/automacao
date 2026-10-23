@@ -1292,15 +1292,36 @@ function lancsComManuaisPC(a,e){
   if(!a.manuais||!a.mesano)return out;
   var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
   var dd=String(new Date(yy,mm,0).getDate()).padStart(2,'0'),ms=String(mm).padStart(2,'0');
-  var ativos={};tiposManuaisPC(e).forEach(function(t){ativos[t.key]=true;});
-  Object.keys(a.manuais).forEach(function(k){
-    var v=a.manuais[k];if(!ativos[k]||isNaN(v)||!v)return;
+  /* mesma ordem da lista (ordem da planilha), para o arquivo sair na sequência */
+  ordenarRegrasPC(a,e,tiposManuaisPC(e)).forEach(function(t){
+    var k=t.key,v=a.manuais[k];if(v===undefined||isNaN(v)||!v)return;
     out.push({tipo:k,valor:Math.abs(v),inverter:v<0,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
   });
   return out;
 }
+/* Ordem das regras: igual às linhas da Memória de Cálculo (PIS e COFINS do mesmo item juntos);
+   regras que não aparecem na planilha vão para o final, também com PIS e COFINS juntos. */
+function ordenarRegrasPC(a,e,ts){
+  var rank={},n=0,ordemNome={};
+  function marca(k){if(k&&!(k in rank))rank[k]=n++;}
+  if(a&&a.memoria&&typeof chaveNomePC==='function'){
+    var porNome={};
+    ts.forEach(function(t){var imp=impostoDaRegra(t);if(!imp)return;var c=chaveNomePC(t.label);(porNome[c]=porNome[c]||{})[imp]=t.key;});
+    (a.memoriaOrdem||a.memoria).forEach(function(l){
+      var c=l.chave||chaveNomePC(l.desc),ex=porNome[c]||{};
+      ['pis','cofins'].forEach(function(imp){marca(ex[imp]);});
+      ['pis','cofins'].forEach(function(imp){var t=regraDifEscolhida(e,l,imp);marca(t&&t.key);});
+    });
+  }
+  ts.forEach(function(t,i){var c=typeof chaveNomePC==='function'?chaveNomePC(t.label):t.label;if(!(c in ordemNome))ordemNome[c]=i;});
+  function imp(t){var x=typeof impostoDaRegra==='function'?impostoDaRegra(t):'';return x==='pis'?0:x==='cofins'?1:2;}
+  return ts.map(function(t,i){
+    var c=typeof chaveNomePC==='function'?chaveNomePC(t.label):t.label;
+    return{t:t,r:(t.key in rank)?rank[t.key]:1e6+ordemNome[c]*3+imp(t),i:i};
+  }).sort(function(x,y){return x.r-y.r||x.i-y.i;}).map(function(x){return x.t;});
+}
 function blocoManuaisPC(a,e){
-  var ts=tiposManuaisPC(e);if(!ts.length)return'';
+  var ts=ordenarRegrasPC(a,e,tiposManuaisPC(e));if(!ts.length)return'';
   if(!a.mesano)return'';
   a.manuais=a.manuais||{};
   var win=pcEditavel(e),lidosPorTipo={};
@@ -1576,7 +1597,7 @@ function lerMemoriaPC(wb){
   var ws=wb.Sheets[nome];
   var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   var c0=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).s.c:0,colDifP=11-c0,colDifC=12-c0; /* colunas L e M */
-  var cnpj='',mesano='',colDesc=-1,colPis=-1,colCofins=-1,linhas=[],pendentes=[],naApuracao=false;
+  var cnpj='',mesano='',colDesc=-1,colPis=-1,colCofins=-1,linhas=[],pendentes=[],naApuracao=false,ordem=[];
   function proxima(r,ci){for(var j=ci+1;j<r.length;j++){if(r[j]!==null&&String(r[j]).trim()!=='')return r[j];}return null;}
   function mesAno(v){
     if(typeof v==='number'&&XLSX.SSF){var d=XLSX.SSF.parse_date_code(v);if(d)return String(d.m).padStart(2,'0')+'/'+d.y;}
@@ -1602,17 +1623,18 @@ function lerMemoriaPC(wb){
     if(/^TOTAL DE (DEBITO|CREDITO)/.test(dn)){
       var lado=/CREDITO/.test(dn)?'cred':'deb';
       pendentes.forEach(function(l){l.lado=lado;});pendentes=[];
-      if(naApuracao&&lado==='cred'&&(vp||vc))linhas.push({desc:'Aproveitamento de crédito (Total de Créditos da apuração)',chave:'APROVEITAMENTO DE CREDITO',pis:vp,cofins:vc,difPis:0,difCofins:0,lado:'',apuracao:true});
+      if(naApuracao&&lado==='cred'&&(vp||vc))ordem.push({desc:'Aproveitamento de crédito',chave:'APROVEITAMENTO DE CREDITO'}),linhas.push({desc:'Aproveitamento de crédito (Total de Créditos da apuração)',chave:'APROVEITAMENTO DE CREDITO',pis:vp,cofins:vc,difPis:0,difCofins:0,lado:'',apuracao:true});
       return;
     }
     if(naApuracao||/^TOTAL/.test(dn)||/^CENTRO DE CUSTOS/.test(dn))return;
     var dp=num(r[colDifP]),dc=num(r[colDifC]);
+    ordem.push({desc:String(desc).trim()}); /* todas as linhas, mesmo zeradas: ordem da lista */
     if(!vp&&!vc&&!dp&&!dc)return;
     var l={desc:String(desc).trim(),pis:vp,cofins:vc,difPis:dp,difCofins:dc,lado:''};
     linhas.push(l);pendentes.push(l);
   });
   if(!linhas.length)return null;
-  return{cnpj:cnpj,mesano:mesano,linhas:linhas};
+  return{cnpj:cnpj,mesano:mesano,linhas:linhas,ordem:ordem};
 }
 /* Nome "limpo" para casar linha da memória com regra: sem PIS/COFINS, sem parênteses, sem (+)/(-), singular */
 function chaveNomePC(s){
@@ -1735,7 +1757,7 @@ function readOneXlsxPC(file){
         var mem=lerMemoriaPC(wb);
         if(mem){
           var mt=matchEmpresaByCnpj(mem.cnpj);
-          resolve({nome:file.name,mesano:mem.mesano,cnpj:mem.cnpj,lancamentos:[],memoria:mem.linhas,empresaKey:mt?mt.key:null,filial:mt?mt.fil:null});
+          resolve({nome:file.name,mesano:mem.mesano,cnpj:mem.cnpj,lancamentos:[],memoria:mem.linhas,memoriaOrdem:mem.ordem,empresaKey:mt?mt.key:null,filial:mt?mt.fil:null});
           return;
         }
         var sheetName=wb.SheetNames.find(function(n){return!/aliquota\s*zero/i.test(n);})||wb.SheetNames[0];
