@@ -979,6 +979,11 @@ function filialPlaceholders(e,fil){
   var uf=f&&f.uf?String(f.uf).toUpperCase():'';
   return{filiallabel:lbl,filialnome:uf?'FILIAL '+uf:lbl,filialsigla:uf?'FL '+uf:lbl};
 }
+/* Lançamento de diferença: histórico sempre "DIFERENÇA " + descrição (se a regra já não começar assim) */
+function histDifPC(h,l){
+  if(!l||!l.diferenca)return h;
+  return /^DIFEREN/.test(normHeader(h))?h:'DIFERENÇA '+h;
+}
 function resolveHist(tpl,ex){
   var h=String(tpl||'');
   if(ex)Object.keys(ex).forEach(function(k){h=h.split('{'+k+'}').join(ex[k]||'');});
@@ -1295,7 +1300,9 @@ function lancsComManuaisPC(a,e){
   /* mesma ordem da lista (ordem da planilha), para o arquivo sair na sequência */
   ordenarRegrasPC(a,e,tiposManuaisPC(e)).forEach(function(t){
     var k=t.key,v=a.manuais[k];if(v===undefined||isNaN(v)||!v)return;
-    out.push({tipo:k,valor:Math.abs(v),inverter:efetivoPC(e,t,v).inv,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
+    /* é diferença: regra de Diferença, valor vindo das colunas L/M, ou valor digitado diferente do da planilha */
+    var pre=(a.preenchidos||{})[k],dif=/DIFERENCA/.test(normHeader(t.label))||!!(a.difKeys&&a.difKeys[k])||(!!a.memoria&&pre!==v);
+    out.push({tipo:k,valor:Math.abs(v),inverter:efetivoPC(e,t,v).inv,diferenca:dif,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
   });
   return out;
 }
@@ -1503,7 +1510,7 @@ function linhasDomFor(lancs,e,tipos,filOverride){
   lancs.forEach(function(l){
     var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
     var ex2=Object.assign({},l.ex,filialPlaceholders(e,fil));
-    out.push({dDisp:l.dDisp,dFmt:l.dFmt,deb:l.inverter?t.cred:t.deb,cred:l.inverter?t.deb:t.cred,val:l.valor,lote:lote,hist:resolveHist(t.hist,ex2)});lote++;
+    out.push({dDisp:l.dDisp,dFmt:l.dFmt,deb:l.inverter?t.cred:t.deb,cred:l.inverter?t.deb:t.cred,val:l.valor,lote:lote,hist:histDifPC(resolveHist(t.hist,ex2),l)});lote++;
   });
   return out;
 }
@@ -1519,7 +1526,7 @@ function linhasWinFor(lancs,e,tipos,filOverride){
   lancs.forEach(function(l){
     var t=tm[l.tipo];if(!t||!t.ativo||!t.deb||!t.cred)return;
     var ex2=Object.assign({},l.ex,filialPlaceholders(e,fil));
-    var vf=fvw(l.valor),hist=resolveHist(t.hist,ex2);
+    var vf=fvw(l.valor),hist=histDifPC(resolveHist(t.hist,ex2),l);
     /* layout aceito pelo Winthor (conferido com importação real): data DDMMAAAA em texto,
        conta/cod. histórico/filial/doc como número, DOC vazio quando não há nota, coluna 11 vazia */
     var dWin=String(l.dDisp||'').replace(/\//g,'');
@@ -1713,7 +1720,7 @@ function aplicarMemoriaPC(a,e,ek,forcar){
   if(!a.memoria||(a.memoriaAplicada===ek&&!forcar))return;
   var porNome={};
   tiposManuaisPC(e).forEach(function(t){var imp=impostoDaRegra(t);if(!imp)return;var c=chaveNomePC(t.label);(porNome[c]=porNome[c]||{})[imp]=t.key;});
-  var manuais={},pre={},semRegra=[],difs=[];
+  var manuais={},pre={},semRegra=[],difs=[],difKeys={};
   function soma(k,v){manuais[k]=Math.round(((manuais[k]||0)+v)*100)/100;pre[k]=manuais[k];}
   a.memoria.forEach(function(l,idx){
     var temDif=l.difPis||l.difCofins;
@@ -1723,7 +1730,7 @@ function aplicarMemoriaPC(a,e,ek,forcar){
         if(!p[2])return;
         var t=regraDifEscolhida(e,l,imp);
         difs.push({idx:idx,desc:l.desc,lado:l.lado,imp:imp,valor:p[2],key:t?t.key:''});
-        if(t)soma(t.key,valorDifPC(e,t,l,imp,p[2]));
+        if(t){soma(t.key,valorDifPC(e,t,l,imp,p[2]));difKeys[t.key]=true;}
         return;
       }
       if(!p[1])return;
@@ -1734,7 +1741,7 @@ function aplicarMemoriaPC(a,e,ek,forcar){
   if(forcar&&a.manuais&&a.preenchidos){ /* preserva edições manuais */
     Object.keys(a.manuais).forEach(function(k){if(a.manuais[k]!==a.preenchidos[k])manuais[k]=a.manuais[k];});
   }
-  a.manuais=manuais;a.preenchidos=pre;a.memoriaSemRegra=semRegra;a.memoriaDifs=difs;a.memoriaAplicada=ek;
+  a.manuais=manuais;a.preenchidos=pre;a.memoriaSemRegra=semRegra;a.memoriaDifs=difs;a.difKeys=difKeys;a.memoriaAplicada=ek;
 }
 /* Troca a regra de uma diferença e grava a escolha na empresa (vale para os próximos meses) */
 function setRegraDifPC(id,idx,imp,key){
