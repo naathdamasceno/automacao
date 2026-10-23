@@ -1564,17 +1564,25 @@ function detectarBasePisCofins(descNorm){
   return null;
 }
 /* ═══ Memória de Cálculo PIS/COFINS (aba "Apuração MM-AAAA": Descrição | ... | PIS | ... | COFINS) ═══
-   Usada pelas empresas Winthor (4E, Safra). Cada linha com valor é casada pelo nome com as regras
-   da empresa e já preenche os "Valores digitados" — o usuário confere e ajusta. */
+   Usada pelas empresas Winthor (4E, Safra). O que a tela faz sozinha:
+   - linha sem diferença: valor (PIS/COFINS) vai para a regra de mesmo nome;
+   - linha com diferença nas colunas L (PIS) e M (COFINS): a diferença vai para a regra escolhida
+     (palpite pelo nome; a escolha fica gravada na empresa para os próximos meses). Nos débitos o
+     imposto a recolher fica a CRÉDITO e nos créditos o imposto a recuperar fica a DÉBITO; diferença
+     negativa inverte. As contas do imposto vêm da regra "Aproveitamento de crédito" (D recolher / C recuperar);
+   - APURAÇÃO › Total de Créditos vai para "Aproveitamento de crédito". */
 function lerMemoriaPC(wb){
   var nome=wb.SheetNames.filter(function(n){return/^APURACAO/.test(normHeader(n));})[0];if(!nome)return null;
-  var rows=XLSX.utils.sheet_to_json(wb.Sheets[nome],{header:1,defval:null,raw:true});
-  var cnpj='',mesano='',colDesc=-1,colPis=-1,colCofins=-1,linhas=[];
+  var ws=wb.Sheets[nome];
+  var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  var c0=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).s.c:0,colDifP=11-c0,colDifC=12-c0; /* colunas L e M */
+  var cnpj='',mesano='',colDesc=-1,colPis=-1,colCofins=-1,linhas=[],pendentes=[],naApuracao=false;
   function proxima(r,ci){for(var j=ci+1;j<r.length;j++){if(r[j]!==null&&String(r[j]).trim()!=='')return r[j];}return null;}
   function mesAno(v){
     if(typeof v==='number'&&XLSX.SSF){var d=XLSX.SSF.parse_date_code(v);if(d)return String(d.m).padStart(2,'0')+'/'+d.y;}
     var m=String(v||'').match(/(\d{1,2})\s*[\/\-]\s*(\d{4})/);return m?String(+m[1]).padStart(2,'0')+'/'+m[2]:'';
   }
+  function num(v){var n=typeof v==='number'?v:parseValorManual(v);return isNaN(n)?0:Math.round(n*100)/100;}
   rows.forEach(function(r){
     r=r||[];
     for(var ci=0;ci<r.length;ci++){
@@ -1583,18 +1591,25 @@ function lerMemoriaPC(wb){
       if(!mesano&&/^PERIODO:?/.test(h))mesano=mesAno(String(r[ci]).replace(/^[^:]*:?/,''))||mesAno(proxima(r,ci));
     }
     var hs=r.map(function(c){return normHeader(c);});
-    if(hs.indexOf('DESCRICAO')>=0){
-      colDesc=hs.indexOf('DESCRICAO');colPis=hs.indexOf('PIS');colCofins=hs.indexOf('COFINS');return;
-    }
-    /* cabeçalho sem "Descrição" (ex.: bloco APURAÇÃO com só PIS | COFINS): troca só as colunas de valor */
+    if(hs.indexOf('DESCRICAO')>=0){colDesc=hs.indexOf('DESCRICAO');colPis=hs.indexOf('PIS');colCofins=hs.indexOf('COFINS');return;}
+    /* cabeçalho sem "Descrição" (bloco APURAÇÃO com só PIS | COFINS): troca só as colunas de valor */
     if(hs.indexOf('PIS')>=0&&hs.indexOf('COFINS')>=0){colPis=hs.indexOf('PIS');colCofins=hs.indexOf('COFINS');return;}
     if(colDesc<0||(colPis<0&&colCofins<0))return;
     var desc=r[colDesc];if(desc===null||typeof desc==='number')return;
-    var dn=normHeader(desc);if(!dn||/^TOTAL/.test(dn)||/^APURACAO$/.test(dn)||/^CENTRO DE CUSTOS/.test(dn))return;
-    var vp=colPis>=0?parseFloat(r[colPis]):NaN,vc=colCofins>=0?parseFloat(r[colCofins]):NaN;
-    vp=isNaN(vp)?0:Math.round(vp*100)/100;vc=isNaN(vc)?0:Math.round(vc*100)/100;
-    if(!vp&&!vc)return;
-    linhas.push({desc:String(desc).trim(),pis:vp,cofins:vc});
+    var dn=normHeader(desc);if(!dn)return;
+    if(dn==='APURACAO'){naApuracao=true;return;}
+    var vp=colPis>=0?num(r[colPis]):0,vc=colCofins>=0?num(r[colCofins]):0;
+    if(/^TOTAL DE (DEBITO|CREDITO)/.test(dn)){
+      var lado=/CREDITO/.test(dn)?'cred':'deb';
+      pendentes.forEach(function(l){l.lado=lado;});pendentes=[];
+      if(naApuracao&&lado==='cred'&&(vp||vc))linhas.push({desc:'Aproveitamento de crédito (Total de Créditos da apuração)',chave:'APROVEITAMENTO DE CREDITO',pis:vp,cofins:vc,difPis:0,difCofins:0,lado:'',apuracao:true});
+      return;
+    }
+    if(naApuracao||/^TOTAL/.test(dn)||/^CENTRO DE CUSTOS/.test(dn))return;
+    var dp=num(r[colDifP]),dc=num(r[colDifC]);
+    if(!vp&&!vc&&!dp&&!dc)return;
+    var l={desc:String(desc).trim(),pis:vp,cofins:vc,difPis:dp,difCofins:dc,lado:''};
+    linhas.push(l);pendentes.push(l);
   });
   if(!linhas.length)return null;
   return{cnpj:cnpj,mesano:mesano,linhas:linhas};
@@ -1605,37 +1620,111 @@ function chaveNomePC(s){
     .replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
   return n.split(' ').map(function(w){return w.length>3&&/S$/.test(w)?w.slice(0,-1):w;}).join(' ');
 }
-var ALIAS_MEMORIA_PC={'CREDITO APURADO DESCONTADO':'APROVEITAMENTO DE CREDITO'};
+var PALAVRAS_FRACAS_PC={DE:1,DA:1,DO:1,E:1,P:1,COMO:1,REF:1,DIFERENCA:1,CFOP:1,PARA:1,UTILIZADO:1,S:1};
+function palavrasPC(s){return chaveNomePC(s).split(' ').filter(function(w){return w&&!PALAVRAS_FRACAS_PC[w]&&!/^\d+$/.test(w);});}
 function impostoDaRegra(t){
   var l=normHeader(t.label),k=t.key.toLowerCase();
   if(/^COFINS/.test(l)||/(^|_)cofins(_|$)/.test(k))return'cofins';
   if(/^PIS/.test(l)||/(^|_)pis(_|$)/.test(k))return'pis';
   return'';
 }
-/* Preenche a.manuais com o que a memória trouxe, uma vez por empresa escolhida */
-function aplicarMemoriaPC(a,e,ek){
-  if(!a.memoria||a.memoriaAplicada===ek)return;
+/* Contas do imposto: regra "Aproveitamento de crédito" = D imposto a recolher / C imposto a recuperar */
+function contasImpostoPC(e,imp){
+  var t=tiposManuaisPC(e).filter(function(x){return impostoDaRegra(x)===imp&&chaveNomePC(x.label)==='APROVEITAMENTO DE CREDITO';})[0];
+  return t?{recolher:String(t.deb),recuperar:String(t.cred)}:null;
+}
+/* Regras candidatas para a diferença de uma linha, da mais provável para a menos */
+function candidatasDifPC(e,l,imp){
+  var alvo=palavrasPC(l.desc),cn=chaveNomePC(l.desc);
+  return tiposManuaisPC(e).filter(function(t){return impostoDaRegra(t)===imp;}).map(function(t){
+    var ws=palavrasPC(t.label),comuns=alvo.filter(function(w){return ws.indexOf(w)>=0;}).length;
+    var sc=chaveNomePC(t.label)===cn?1000:(comuns?comuns*10-Math.abs(ws.length-alvo.length):-1);
+    return{t:t,sc:sc};
+  }).filter(function(x){return x.sc>0;}).sort(function(a,b){return b.sc-a.sc;}).map(function(x){return x.t;});
+}
+function regraDifEscolhida(e,l,imp){
+  var mem=((e.mapeamento||{})._memoria_pc||{})[chaveNomePC(l.desc)]||{};
+  var ativos={};tiposManuaisPC(e).forEach(function(t){ativos[t.key]=t;});
+  if(mem[imp]&&ativos[mem[imp]])return ativos[mem[imp]];
+  return candidatasDifPC(e,l,imp)[0]||null;
+}
+/* Valor com sinal para a regra: negativo = lançamento invertido (D↔C) */
+function valorDifPC(e,t,l,imp,v){
+  var ci=contasImpostoPC(e,imp),inv=v<0;
+  if(ci&&l.lado==='deb'){if(String(t.deb)===ci.recolher&&String(t.cred)!==ci.recolher)inv=!inv;}
+  else if(ci&&l.lado==='cred'){if(String(t.cred)===ci.recuperar&&String(t.deb)!==ci.recuperar)inv=!inv;}
+  return inv?-Math.abs(v):Math.abs(v);
+}
+/* Preenche a.manuais com o que a memória trouxe. Mantém o que o usuário já mudou à mão. */
+function aplicarMemoriaPC(a,e,ek,forcar){
+  if(!a.memoria||(a.memoriaAplicada===ek&&!forcar))return;
   var porNome={};
   tiposManuaisPC(e).forEach(function(t){var imp=impostoDaRegra(t);if(!imp)return;var c=chaveNomePC(t.label);(porNome[c]=porNome[c]||{})[imp]=t.key;});
-  var manuais={},pre={},semRegra=[];
-  a.memoria.forEach(function(l){
-    var c=chaveNomePC(l.desc);c=ALIAS_MEMORIA_PC[c]||c;var alvo=porNome[c]||{};
-    [['pis',l.pis],['cofins',l.cofins]].forEach(function(p){
+  var manuais={},pre={},semRegra=[],difs=[];
+  function soma(k,v){manuais[k]=Math.round(((manuais[k]||0)+v)*100)/100;pre[k]=manuais[k];}
+  a.memoria.forEach(function(l,idx){
+    var temDif=l.difPis||l.difCofins;
+    [['pis',l.pis,l.difPis],['cofins',l.cofins,l.difCofins]].forEach(function(p){
+      var imp=p[0];
+      if(temDif){
+        if(!p[2])return;
+        var t=regraDifEscolhida(e,l,imp);
+        difs.push({idx:idx,desc:l.desc,lado:l.lado,imp:imp,valor:p[2],key:t?t.key:''});
+        if(t)soma(t.key,valorDifPC(e,t,l,imp,p[2]));
+        return;
+      }
       if(!p[1])return;
-      var k=alvo[p[0]];
-      if(k){manuais[k]=Math.round(((manuais[k]||0)+p[1])*100)/100;pre[k]=manuais[k];}
-      else semRegra.push({desc:l.desc,imp:p[0].toUpperCase(),valor:p[1]});
+      var k=(porNome[l.chave||chaveNomePC(l.desc)]||{})[imp];
+      if(k)soma(k,p[1]);else semRegra.push({desc:l.desc,imp:imp.toUpperCase(),valor:p[1]});
     });
   });
-  a.manuais=manuais;a.preenchidos=pre;a.memoriaSemRegra=semRegra;a.memoriaAplicada=ek;
+  if(forcar&&a.manuais&&a.preenchidos){ /* preserva edições manuais */
+    Object.keys(a.manuais).forEach(function(k){if(a.manuais[k]!==a.preenchidos[k])manuais[k]=a.manuais[k];});
+  }
+  a.manuais=manuais;a.preenchidos=pre;a.memoriaSemRegra=semRegra;a.memoriaDifs=difs;a.memoriaAplicada=ek;
 }
-function blocoMemoriaPC(a){
+/* Troca a regra de uma diferença e grava a escolha na empresa (vale para os próximos meses) */
+function setRegraDifPC(id,idx,imp,key){
+  var a=arquivosPC.filter(function(x){return x.id===id;})[0];if(!a||!a.memoria)return;
+  var e=db.empresas[a.empresaKey];if(!e)return;
+  var l=a.memoria[idx];if(!l)return;
+  var mapa=JSON.parse(JSON.stringify(e.mapeamento||{}));
+  var mp=mapa._memoria_pc=mapa._memoria_pc||{},c=chaveNomePC(l.desc);
+  mp[c]=mp[c]||{};mp[c][imp]=key;
+  e.mapeamento=mapa; /* já vale nesta tela */
+  aplicarMemoriaPC(a,e,a.empresaKey,true);renderPreviewPC();
+  if(ME.canEdit){
+    var copia=JSON.parse(JSON.stringify(e));
+    persistEmpresa(a.empresaKey,comRegistro(e,copia,'alterou')).catch(function(err){alert('Não consegui gravar a escolha na empresa: '+msgErroBase(err));});
+  }
+}
+function blocoMemoriaPC(a,e){
   if(!a.memoria)return'';
-  var n=Object.keys(a.preenchidos||{}).length,sr=a.memoriaSemRegra||[];
-  return '<div class="alert alert-ok" style="margin-top:8px"><i class="ti ti-check"></i><span>Memória de cálculo lida: <strong>'+n+'</strong> regra(s) preenchida(s) abaixo com o valor da planilha. Confira e ajuste se precisar.</span></div>'+
-    (sr.length?'<details class="alert alert-info" style="margin-top:8px;display:block"><summary style="cursor:pointer"><i class="ti ti-info-circle"></i> '+sr.length+' valor(es) da planilha sem regra com o mesmo nome (não lançados)</summary>'+
+  var n=Object.keys(a.preenchidos||{}).length,sr=a.memoriaSemRegra||[],difs=a.memoriaDifs||[];
+  var regras=tiposManuaisPC(e);
+  var html='<div class="alert alert-ok" style="margin-top:8px"><i class="ti ti-check"></i><span>Memória de cálculo lida: <strong>'+n+'</strong> regra(s) preenchida(s) abaixo com o valor da planilha. Confira e ajuste se precisar.</span></div>';
+  if(difs.length){
+    html+='<div style="margin-top:8px;padding:10px 12px;border:0.5px solid #D3D1C7;border-radius:8px;background:#FAFAF8">'+
+      '<div style="font-size:12px;font-weight:500;margin-bottom:6px"><i class="ti ti-arrows-diff"></i> Diferenças da planilha (colunas L = PIS e M = COFINS)</div>'+
+      difs.map(function(d){
+        var t=null;regras.forEach(function(x){if(x.key===d.key)t=x;});
+        var l=a.memoria[d.idx],sv=t?valorDifPC(e,t,l,d.imp,d.valor):0;
+        var deb=t?(sv<0?t.cred:t.deb):'—',cred=t?(sv<0?t.deb:t.cred):'—';
+        var ops=regras.filter(function(x){return impostoDaRegra(x)===d.imp;});
+        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;font-size:12px">'+
+          '<div style="flex:1;min-width:200px">'+esc(d.imp.toUpperCase())+' — '+esc(d.desc)+' <span style="color:#888">('+(d.lado==='cred'?'crédito':d.lado==='deb'?'débito':'—')+')</span>'+
+            '<div class="tipo-contas">R$ '+fmtValorBR(d.valor)+' → D: '+esc(deb)+' / C: '+esc(cred)+'</div></div>'+
+          '<select aria-label="Regra da diferença" onchange="setRegraDifPC(\''+a.id+'\','+d.idx+',\''+d.imp+'\',this.value)" style="max-width:320px;height:32px;font-size:12px">'+
+            (t?'':'<option value="">— escolha a regra —</option>')+
+            ops.map(function(x){return'<option value="'+esc(x.key)+'"'+(x.key===d.key?' selected':'')+'>'+esc(x.label)+'</option>';}).join('')+
+          '</select></div>';
+      }).join('')+
+      '<div style="font-size:10px;color:#888">Débitos: imposto a recolher a crédito; créditos: imposto a recuperar a débito; diferença negativa inverte. A regra escolhida fica gravada na empresa para os próximos meses.</div></div>';
+  }
+  if(sr.length)html+='<details class="alert alert-info" style="margin-top:8px;display:block"><summary style="cursor:pointer"><i class="ti ti-info-circle"></i> '+sr.length+' valor(es) da planilha sem regra com o mesmo nome (não lançados)</summary>'+
       sr.map(function(x){return'<div style="font-size:11px;margin-top:2px">'+esc(x.imp)+' — '+esc(x.desc)+' — <strong>R$ '+fmtValorBR(x.valor)+'</strong></div>';}).join('')+
-      '<div style="font-size:11px;margin-top:4px">Para preencher sozinho, cadastre em Empresas uma regra com o mesmo nome da linha (ex.: "PIS — '+esc(sr[0].desc)+'"). Se for diferença, digite o valor na regra certa.</div></details>':'');
+      '<div style="font-size:11px;margin-top:4px">Normal: no Winthor esses valores já entram pelo sistema. Se houver diferença, informe nas colunas L (PIS) e M (COFINS) da planilha.</div></details>';
+  return html;
 }
 function readOneXlsxPC(file){
   return new Promise(function(resolve){
@@ -1791,7 +1880,7 @@ function renderPreviewPC(){
           (linhas.length>8?'<tr><td colspan="5" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-8)+' linhas</td></tr>':'')+'</table>';
       }
     }
-    if(e&&!a.duplicado&&filialResolvida)body=blocoMemoriaPC(a)+body+blocoEditaveisPC(a,e)+blocoManuaisPC(a,e);
+    if(e&&!a.duplicado&&filialResolvida)body=blocoMemoriaPC(a,e)+body+blocoEditaveisPC(a,e)+blocoManuaisPC(a,e);
     return '<div class="card">'+head+empBlock+body+'</div>';
   }).join('');
   if(prevEl)prevEl.innerHTML=html;
