@@ -1637,7 +1637,7 @@ function detectarBasePisCofins(descNorm){
      (palpite pelo nome; a escolha fica gravada na empresa para os próximos meses). Nos débitos o
      imposto a recolher fica a CRÉDITO e nos créditos o imposto a recuperar fica a DÉBITO; diferença
      negativa inverte. As contas do imposto vêm da regra "Aproveitamento de crédito" (D recolher / C recuperar);
-   - APURAÇÃO › Total de Créditos vai para "Aproveitamento de crédito". */
+   - APURAÇÃO › Total de Débitos vai para "Aproveitamento de crédito". */
 function lerMemoriaPC(wb){
   var nome=wb.SheetNames.filter(function(n){return/^APURACAO/.test(normHeader(n));})[0];if(!nome)return null;
   var ws=wb.Sheets[nome];
@@ -1669,7 +1669,7 @@ function lerMemoriaPC(wb){
     if(/^TOTAL DE (DEBITO|CREDITO)/.test(dn)){
       var lado=/CREDITO/.test(dn)?'cred':'deb';
       pendentes.forEach(function(l){l.lado=lado;});pendentes=[];
-      if(naApuracao&&lado==='cred'&&(vp||vc))ordem.push({desc:'Aproveitamento de crédito',chave:'APROVEITAMENTO DE CREDITO'}),linhas.push({desc:'Aproveitamento de crédito (Total de Créditos da apuração)',chave:'APROVEITAMENTO DE CREDITO',pis:vp,cofins:vc,difPis:0,difCofins:0,lado:'',apuracao:true});
+      if(naApuracao&&lado==='deb'&&(vp||vc))ordem.push({desc:'Aproveitamento de crédito',chave:'APROVEITAMENTO DE CREDITO'}),linhas.push({desc:'Aproveitamento de crédito (Total de Débitos da apuração)',chave:'APROVEITAMENTO DE CREDITO',pis:vp,cofins:vc,difPis:0,difCofins:0,lado:'',apuracao:true});
       return;
     }
     if(naApuracao||/^TOTAL/.test(dn)||/^CENTRO DE CUSTOS/.test(dn))return;
