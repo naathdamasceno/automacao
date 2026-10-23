@@ -1295,9 +1295,37 @@ function lancsComManuaisPC(a,e){
   /* mesma ordem da lista (ordem da planilha), para o arquivo sair na sequência */
   ordenarRegrasPC(a,e,tiposManuaisPC(e)).forEach(function(t){
     var k=t.key,v=a.manuais[k];if(v===undefined||isNaN(v)||!v)return;
-    out.push({tipo:k,valor:Math.abs(v),inverter:v<0,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
+    out.push({tipo:k,valor:Math.abs(v),inverter:efetivoPC(e,t,v).inv,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},manual:true});
   });
   return out;
+}
+/* ═══ Lado das contas (D/C) dos valores digitados de PIS/COFINS ═══
+   Regras de "Diferença": nos débitos o imposto a recolher (ex.: 20020/20021) fica a CRÉDITO e nos créditos
+   o imposto a recuperar (ex.: 10034/10035) fica a DÉBITO — as contas vêm da regra "Aproveitamento de crédito".
+   Valor negativo inverte. Além disso, cada regra pode ser invertida à mão (botão ⇄), e isso fica gravado na empresa. */
+function viraAutoPC(e,t){
+  if(typeof chaveNomePC!=='function'||!/DIFERENCA/.test(normHeader(t.label)))return false;
+  var ci=contasImpostoPC(e,impostoDaRegra(t));if(!ci)return false;
+  var d=String(t.deb),c=String(t.cred);
+  if(d===ci.recolher&&c!==ci.recolher)return true;
+  if(c===ci.recuperar&&d!==ci.recuperar)return true;
+  return false;
+}
+function viraManualPC(e,t){return!!(((e.mapeamento||{})._inverter_pc||{})[t.key]);}
+function efetivoPC(e,t,v){
+  var inv=(v<0)!==viraAutoPC(e,t)!==viraManualPC(e,t);
+  return{inv:inv,deb:inv?t.cred:t.deb,cred:inv?t.deb:t.cred};
+}
+function inverterRegraPC(k,key){
+  var e=db.empresas[k];if(!e)return;
+  var mapa=JSON.parse(JSON.stringify(e.mapeamento||{}));
+  var iv=mapa._inverter_pc=mapa._inverter_pc||{};
+  if(iv[key])delete iv[key];else iv[key]=true;
+  e.mapeamento=mapa;renderPreviewPC();
+  if(ME.canEdit){
+    var copia=JSON.parse(JSON.stringify(e));
+    persistEmpresa(k,comRegistro(e,copia,'alterou')).catch(function(err){alert('Não consegui gravar na empresa: '+msgErroBase(err));});
+  }
 }
 /* Ordem das regras: igual às linhas da Memória de Cálculo (PIS e COFINS do mesmo item juntos);
    regras que não aparecem na planilha vão para o final, também com PIS e COFINS juntos. */
@@ -1330,17 +1358,19 @@ function blocoManuaisPC(a,e){
     '<summary style="font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-pencil"></i> Valores digitados — '+ts.length+(win?' regras':' tipos')+' de PIS/COFINS desta empresa</summary><div style="margin-top:8px">'+
     ts.map(function(t){
       var v=a.manuais[t.key],falta=!t.deb||!t.cred,lidos=lidosPorTipo[t.key],pre=(a.preenchidos||{})[t.key];
+      var ef=efetivoPC(e,t,v||0),man=viraManualPC(e,t),trocou=ef.deb!==t.deb;
       return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
         '<div style="flex:1;min-width:180px;font-size:12px">'+esc(t.label)+
-          '<div class="tipo-contas">D: '+esc(t.deb||'—')+' / C: '+esc(t.cred||'—')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+
+          '<div class="tipo-contas">D: '+esc(ef.deb||'—')+' / C: '+esc(ef.cred||'—')+(trocou?' <span style="color:#B26A00">(invertido)</span>':'')+(falta?' <span style="color:#A32D2D">(conta em branco)</span>':'')+
           (lidos?' <span style="color:#00682F;font-weight:500">· lido da planilha: '+fmtValorBR(lidos)+' (já incluído; só digite se houver valor a mais)</span>':'')+
           (pre!==undefined?(v===pre?' <span style="color:#00682F;font-weight:500">· da planilha</span>':' <span style="color:#B26A00;font-weight:500">· editado (planilha: '+fmtValorBR(pre)+')</span>'):'')+'</div></div>'+
         '<input type="text" inputmode="decimal" placeholder="0,00" aria-label="Valor '+esc(t.label)+'" value="'+(v?fmtValorBR(v):'')+'" '+
           'onchange="setManualPC(\''+a.id+'\',\''+esc(t.key)+'\',this.value)" '+
           'style="width:140px;height:32px;padding:0 10px;border:0.5px solid #D3D1C7;border-radius:8px;font-size:13px;text-align:right">'+
+        (win?'<button type="button" class="btn btn-secondary btn-sm" title="Trocar Débito e Crédito desta regra (fica gravado na empresa)" aria-label="Inverter contas de '+esc(t.label)+'" onclick="inverterRegraPC(\''+esc(a.empresaKey)+'\',\''+esc(t.key)+'\')" style="height:32px'+(man?';background:#FFF1D6;border-color:#EF9F27':'')+'"><i class="ti ti-arrows-exchange"></i></button>':'')+
       '</div>';
     }).join('')+
-    '<div style="font-size:10px;color:#888">Deixe em branco ou 0 para não lançar. Valor negativo inverte Débito e Crédito.</div>'+
+    '<div style="font-size:10px;color:#888">Deixe em branco ou 0 para não lançar. Valor negativo inverte Débito e Crédito.'+(win?' Diferenças: nos débitos o imposto a recolher fica a crédito e nos créditos o imposto a recuperar fica a débito (conforme a regra "Aproveitamento de crédito"). O botão <i class="ti ti-arrows-exchange"></i> troca D/C da regra e fica gravado na empresa.':'')+'</div>'+
   '</div></details>';
 }
 function tabelaWinthor(linhas,max){
@@ -1672,6 +1702,7 @@ function regraDifEscolhida(e,l,imp){
 }
 /* Valor com sinal para a regra: negativo = lançamento invertido (D↔C) */
 function valorDifPC(e,t,l,imp,v){
+  if(/DIFERENCA/.test(normHeader(t.label)))return v; /* regras de Diferença: lado definido em viraAutoPC */
   var ci=contasImpostoPC(e,imp),inv=v<0;
   if(ci&&l.lado==='deb'){if(String(t.deb)===ci.recolher&&String(t.cred)!==ci.recolher)inv=!inv;}
   else if(ci&&l.lado==='cred'){if(String(t.cred)===ci.recuperar&&String(t.deb)!==ci.recuperar)inv=!inv;}
@@ -1731,7 +1762,7 @@ function blocoMemoriaPC(a,e){
       difs.map(function(d){
         var t=null;regras.forEach(function(x){if(x.key===d.key)t=x;});
         var l=a.memoria[d.idx],sv=t?valorDifPC(e,t,l,d.imp,d.valor):0;
-        var deb=t?(sv<0?t.cred:t.deb):'—',cred=t?(sv<0?t.deb:t.cred):'—';
+        var ef=t?efetivoPC(e,t,sv):null,deb=ef?ef.deb:'—',cred=ef?ef.cred:'—';
         var ops=regras.filter(function(x){return impostoDaRegra(x)===d.imp;});
         return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;font-size:12px">'+
           '<div style="flex:1;min-width:200px">'+esc(d.imp.toUpperCase())+' — '+esc(d.desc)+' <span style="color:#888">('+(d.lado==='cred'?'crédito':d.lado==='deb'?'débito':'—')+')</span>'+
