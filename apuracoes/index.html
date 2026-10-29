@@ -1301,8 +1301,77 @@ function blocoEditaveisPC(a,e){
     '<div style="font-size:10px;color:#888">Apague o campo para voltar ao valor da planilha. 0 tira a linha; valor negativo inverte Débito e Crédito.</div>'+
   '</div>';
 }
+
+/* ═══ Planilha Resumo (Domínio): bloco de totais e apuração ═══
+   - Linhas avulsas com valor (ex.: "Debito PIS acrescimento 10% LC 224/25") casam com a regra de mesmo nome.
+   - Apuração (regra "Apuração PIS"/"Apuração COFINS", D passivo / C ativo):
+       a recolher  → valor = Total de Créditos (zera o ativo);
+       saldo credor → valor = Total de Débitos + acréscimos (zera o passivo). */
+function lerResumoTotaisPC(rows,colPis,colCofins){
+  var t={deb:{pis:0,cofins:0},cred:{pis:0,cofins:0},acresc:{pis:0,cofins:0},recolher:{pis:0,cofins:0},credor:{pis:0,cofins:0}},extras=[],viuDeb=false,viuCred=false;
+  function primeiroNum(r){for(var j=2;j<r.length;j++){if(typeof r[j]==='number')return Math.round(r[j]*100)/100;}return 0;}
+  function n(v){return typeof v==='number'?Math.round(v*100)/100:0;}
+  rows.forEach(function(r){
+    if(!r)return;var d=r[1];if(d===null||d===undefined||typeof d==='number')return;
+    var dn=normHeader(d);if(!dn)return;
+    var imp=/COFINS/.test(dn)?'cofins':(/PIS/.test(dn)?'pis':'');
+    if(/^TOTAL DE DEBITO/.test(dn)){if(!viuDeb&&(typeof r[colPis]==='number'||typeof r[colCofins]==='number')){t.deb.pis=n(r[colPis]);t.deb.cofins=n(r[colCofins]);viuDeb=true;}return;}
+    if(/^TOTAL DE CREDITO/.test(dn)){if(!viuCred&&(typeof r[colPis]==='number'||typeof r[colCofins]==='number')){t.cred.pis=n(r[colPis]);t.cred.cofins=n(r[colCofins]);viuCred=true;}return;}
+    if(/A RECOLHER$/.test(dn)&&imp){t.recolher[imp]=primeiroNum(r);return;}
+    if(/^SALDOR? CREDOR/.test(dn)&&imp){t.credor[imp]=primeiroNum(r);return;}
+    if(!viuDeb||!viuCred)return; /* linhas avulsas só no bloco de resumo, depois das consolidações */
+    if(/^TOTAL\b|^DESCRICAO$/.test(dn))return;
+    var v=primeiroNum(r);if(!v)return;
+    if(/ACRESCIM/.test(dn)&&imp)t.acresc[imp]=Math.round((t.acresc[imp]+v)*100)/100;
+    extras.push({desc:String(d).trim(),valor:v,imp:imp});
+  });
+  return{totais:t,extras:extras};
+}
+function regraPorNomePC(e,desc){
+  var c=chaveNomePC(desc),n=normHist(desc);
+  return getTiposPC(e).filter(function(t){
+    if(!t.ativo||!t.deb||!t.cred)return false;
+    return chaveNomePC(t.label)===c||normHist(t.hist)===n;
+  })[0]||null;
+}
+function regraApuracaoPC(e,imp){
+  return getTiposPC(e).filter(function(t){return t.ativo&&t.deb&&t.cred&&impostoDaRegra(t)===imp&&/^APURACAO/.test(chaveNomePC(t.label));})[0]||null;
+}
+/* valor da apuração e de onde veio, por imposto */
+function apuracaoResumoPC(a,imp){
+  var t=a.resumoPC;if(!t)return null;
+  if(t.recolher[imp]>0)return{valor:t.cred[imp],origem:'a recolher '+fmtValorBR(t.recolher[imp])+' → Total de Créditos (zera o ativo)'};
+  if(t.credor[imp]>0)return{valor:Math.round((t.deb[imp]+t.acresc[imp])*100)/100,origem:'saldo credor '+fmtValorBR(t.credor[imp])+' → Total de Débitos'+(t.acresc[imp]?' + acréscimo':'')+' (zera o passivo)'};
+  return{valor:t.cred[imp],origem:'saldo zero → Total de Créditos'};
+}
+function lancsResumoPC(a,e){
+  var out=[];if(!a.resumoPC||!a.mesano||!e)return out;
+  var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
+  var dd=String(new Date(yy,mm,0).getDate()).padStart(2,'0'),ms=String(mm).padStart(2,'0');
+  function l(k,v,extra){var o={tipo:k,valor:v,dDisp:dd+'/'+ms+'/'+yy,dFmt:String(yy)+ms+dd,mesano:a.mesano,ex:{mesano:a.mesano},resumo:true};for(var x in extra)o[x]=extra[x];return o;}
+  (a.extrasPC||[]).forEach(function(x){var t=regraPorNomePC(e,x.desc);if(t)out.push(l(t.key,x.valor));});
+  ['pis','cofins'].forEach(function(imp){
+    var t=regraApuracaoPC(e,imp),ap=apuracaoResumoPC(a,imp);
+    if(t&&ap&&ap.valor>0)out.push(l(t.key,ap.valor,{origemApuracao:ap.origem}));
+  });
+  return out;
+}
+/* Aviso na prévia: linhas avulsas sem regra e apuração sem regra cadastrada */
+function blocoResumoPC(a,e){
+  if(!a.resumoPC||!e)return'';
+  var html='',sem=(a.extrasPC||[]).filter(function(x){return!regraPorNomePC(e,x.desc);});
+  if(sem.length)html+='<div class="alert alert-info" style="margin-top:8px;flex-direction:column;align-items:flex-start;gap:4px"><div><i class="ti ti-info-circle"></i> Linhas do resumo <strong>sem regra cadastrada</strong> (não lançadas):</div>'+
+    sem.map(function(x){return'<div style="font-size:11px">'+esc(x.desc)+' — <strong>R$ '+fmtValorBR(x.valor)+'</strong></div>';}).join('')+
+    '<div style="font-size:11px">Cadastre em Empresas um tipo de PIS/COFINS com esse mesmo nome.</div></div>';
+  var falta=['pis','cofins'].filter(function(imp){return!regraApuracaoPC(e,imp);});
+  var linhas=['pis','cofins'].map(function(imp){var ap=apuracaoResumoPC(a,imp);return ap?imp.toUpperCase()+': '+ap.origem+' = R$ '+fmtValorBR(ap.valor):'';}).filter(Boolean);
+  html+='<div style="font-size:11px;color:#5F5E5A;margin-top:6px">Apuração — '+linhas.join(' · ')+
+    (falta.length?' <span style="color:#A32D2D">(sem regra "Apuração '+falta.map(function(x){return x.toUpperCase();}).join('/')+'" no cadastro — não lançada)</span>':'')+'</div>';
+  return html;
+}
+
 function lancsComManuaisPC(a,e){
-  var out=lancsLidosPC(a,e);
+  var out=lancsLidosPC(a,e).concat(lancsResumoPC(a,e));
   if(!a.manuais||!a.mesano)return out;
   var mm=parseInt(a.mesano.split('/')[0],10),yy=parseInt(a.mesano.split('/')[1],10);
   var dd=String(new Date(yy,mm,0).getDate()).padStart(2,'0'),ms=String(mm).padStart(2,'0');
@@ -1838,8 +1907,9 @@ function readOneXlsxPC(file){
           if(!isNaN(vPis)&&vPis!==0)lancamentos.push({tipo:'pis_'+base,valor:vPis,dDisp:dDisp,ex:{mesano:mesano}});
           if(!isNaN(vCofins)&&vCofins!==0)lancamentos.push({tipo:'cofins_'+base,valor:vCofins,dDisp:dDisp,ex:{mesano:mesano}});
         });
+        var rr=lerResumoTotaisPC(rows,colPis,colCofins);
         var match=matchEmpresaByCnpj(cnpj);
-        resolve({nome:file.name,mesano:mesano,cnpj:cnpj,lancamentos:lancamentos,empresaKey:match?match.key:null,filial:match?match.fil:null});
+        resolve({nome:file.name,mesano:mesano,cnpj:cnpj,lancamentos:lancamentos,resumoPC:rr.totais,extrasPC:rr.extras,empresaKey:match?match.key:null,filial:match?match.fil:null});
       }catch(err){resolve({nome:file.name,erro:err.message});}
     };
     reader.readAsArrayBuffer(file);
@@ -1948,11 +2018,11 @@ function renderPreviewPC(){
         body=tabelaWinthor(linhas,10);
       } else {
         body='<table class="preview-table" style="margin-top:8px"><tr><th>Data</th><th>Débito</th><th>Crédito</th><th>Valor</th><th>Histórico</th></tr>'+
-          linhas.slice(0,8).map(function(l){return'<tr><td>'+l.dDisp+'</td><td>'+l.deb+'</td><td>'+l.cred+'</td><td>'+l.val.toFixed(2).replace('.',',')+'</td><td>'+esc(l.hist.slice(0,50))+(l.hist.length>50?'…':'')+'</td></tr>';}).join('')+
-          (linhas.length>8?'<tr><td colspan="5" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-8)+' linhas</td></tr>':'')+'</table>';
+          linhas.slice(0,40).map(function(l){return'<tr><td>'+l.dDisp+'</td><td>'+l.deb+'</td><td>'+l.cred+'</td><td>'+l.val.toFixed(2).replace('.',',')+'</td><td>'+esc(l.hist.slice(0,50))+(l.hist.length>50?'…':'')+'</td></tr>';}).join('')+
+          (linhas.length>40?'<tr><td colspan="5" style="text-align:center;color:#888;font-size:10px;font-style:italic">... +'+(linhas.length-40)+' linhas</td></tr>':'')+'</table>';
       }
     }
-    if(e&&!a.duplicado&&filialResolvida)body=blocoMemoriaPC(a,e)+body+blocoEditaveisPC(a,e)+blocoManuaisPC(a,e);
+    if(e&&!a.duplicado&&filialResolvida)body=blocoMemoriaPC(a,e)+body+blocoResumoPC(a,e)+blocoEditaveisPC(a,e)+blocoManuaisPC(a,e);
     return '<div class="card">'+head+empBlock+body+'</div>';
   }).join('');
   if(prevEl)prevEl.innerHTML=html;
