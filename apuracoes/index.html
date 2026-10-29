@@ -2230,15 +2230,16 @@ function linhasDepr(a,depr,fil){
     if(!g){notes.push({k:'warn',t:'Grupo '+c.g+' ('+c.nome+') não aparece no PDF; ficou de fora.'});return;}
     usados[g.g]=true;
     if(nn(g.nome)!==nn(c.nome))notes.push({k:'warn',t:'Grupo '+c.g+': no PDF o nome é "'+g.nome+'" e no cadastro é "'+c.nome+'". Confira se é o mesmo grupo.'});
-    if(!c.d||!c.c){notes.push({k:'err',t:'Grupo '+c.g+' ('+c.nome+') está sem conta débito ou crédito no cadastro.'});return;}
     if(!g.dep){notes.push({k:'warn',t:'Grupo '+c.g+' ('+c.nome+') com depreciação zero no mês; não gerei lançamento.'});return;}
-    var hist=DEPR_HIST.replace('{grupo}',c.nome).replace('{mesano}',a.mesano);
+    if(!c.d||!c.c){notes.push({k:'err',t:'Grupo '+c.g+' ('+c.nome+') está sem conta débito ou crédito no cadastro.'});return;}
+    /* histórico configurável por empresa ({grupo}, {mesano}); padrão = modelo da 4E */
+    var hist=String(depr.hist||DEPR_HIST).split('{grupo}').join(c.nome).split('{mesano}').join(a.mesano);
     var vf=fvw(g.dep);
     /* mesmo formato aceito pelo Winthor nos lançamentos de ICMS: DOC e coluna 11 vazios */
     rows.push(['C3',_numOuTexto(c.nd||1),_numOuTexto(c.d),dFmt,'D',null,vf,codH,hist,'N',null,_numOuTexto(fil)]);
     rows.push(['C3',_numOuTexto(c.nc||2),_numOuTexto(c.c),dFmt,'C',null,vf,codH,hist,'N',null,_numOuTexto(fil)]);
   });
-  a.grupos.forEach(function(g){if(!usados[g.g])notes.push({k:'err',t:'Grupo '+g.g+' ('+g.nome+') está no PDF com R$ '+g.dep.toFixed(2).replace('.',',')+', mas não tem conta cadastrada. Inclua em Empresas → Mapeamento Depreciação.'});});
+  a.grupos.forEach(function(g){if(!usados[g.g]&&g.dep>0)notes.push({k:'err',t:'Grupo '+g.g+' ('+g.nome+') está no PDF com R$ '+g.dep.toFixed(2).replace('.',',')+', mas não tem conta cadastrada. Inclua em Empresas → Mapeamento Depreciação.'});});
   var totPdf=a.grupos.reduce(function(s,g){return s+(g.dep||0);},0);
   var totD=rows.filter(function(r){return r[4]==='D';}).reduce(function(s,r){return s+parseFloat(r[6]);},0);
   return{rows:rows,notes:notes,totPdf:totPdf,totD:totD};
@@ -2334,7 +2335,8 @@ function buildDeprForm(e){
   var d=(e.mapeamento&&e.mapeamento._depreciacao)||null;
   if(!d||!d.grupos||!d.grupos.length){var cs=e.nome?getFiliais(e).map(function(f){return f.cnpj;}):[];d=deprPadraoPorCnpjs(cs)||{cod_h:'1',grupos:[]};}
   return'<div class="sep"></div><div class="section-title">Mapeamento Depreciação <span style="font-weight:300;color:#aaa;font-size:11px">(Resumo da Depreciação Fiscal da Domínio → Winthor — cada grupo gera D na conta de despesa e C na conta do ativo; a ordem abaixo é a ordem no arquivo)</span></div>'+
-    '<div class="field" style="max-width:200px"><label>Código de Histórico (depreciação)</label><input type="text" id="ef-dp-codh" value="'+esc(d.cod_h||'1')+'"></div>'+
+    '<div class="grid2"><div class="field"><label for="ef-dp-codh">Código de Histórico (depreciação)</label><input type="text" id="ef-dp-codh" value="'+esc(d.cod_h||'1')+'"></div>'+
+    '<div class="field"><label for="ef-dp-hist">Histórico <span style="font-weight:300;color:#aaa;font-size:11px">({grupo} e {mesano})</span></label><input type="text" id="ef-dp-hist" value="'+esc(d.hist||'')+'" placeholder="'+esc(DEPR_HIST)+'"></div></div>'+
     '<div style="display:grid;grid-template-columns:48px minmax(120px,1fr) 70px 70px 44px 44px 30px;gap:6px;font-size:10px;color:#888;margin-bottom:4px"><span>Grupo</span><span>Conta patrimonial</span><span>Débito</span><span>Crédito</span><span>Nº D</span><span>Nº C</span><span></span></div>'+
     '<div id="ef-dp-list">'+d.grupos.map(deprRowHtml).join('')+'</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'+
@@ -2349,7 +2351,9 @@ function lerDeprForm(){
     if(!v('dp-g')&&!v('dp-d')&&!v('dp-c'))return;
     grupos.push({g:v('dp-g'),nome:v('dp-nome').toUpperCase(),d:v('dp-d'),c:v('dp-c'),nd:v('dp-nd')||'1',nc:v('dp-nc')||'2'});
   });
-  return{cod_h:((document.getElementById('ef-dp-codh')||{}).value||'1').trim(),grupos:grupos};
+  var out={cod_h:((document.getElementById('ef-dp-codh')||{}).value||'1').trim(),grupos:grupos};
+  var h=((document.getElementById('ef-dp-hist')||{}).value||'').trim();if(h)out.hist=h;
+  return out;
 }
 
 /* ══════════════════ EMPRESAS ══════════════════ */
